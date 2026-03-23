@@ -1,0 +1,37 @@
+# Data & Weights
+Data/
+test_data/
+trained_weights/
+trained_weights_tf/
+**/checkpoints/
+**/3d_checkpoints/
+**/2p5d_checkpoints/
+**/2p5d_tf_checkpoints/
+**/test_data/
+**/trained_weights/
+*.npy
+*.npz
+*.h5
+*.pth
+*.tar.gz
+*.zip
+
+# Generated Artifacts & Results
+out/
+*.xmodel
+**/gpu_results/
+**/evaluation_results/
+results.json
+*.png
+
+# Python & IDE
+__pycache__/
+**/__pycache__/
+.pytest_cache/
+.claude/
+.ipynb_checkpoints/
+.DS_Store
+# Documents
+*.pdf
+*.md
+!README.md
