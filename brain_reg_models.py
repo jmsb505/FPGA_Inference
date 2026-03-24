@@ -129,32 +129,38 @@ def build_vxm_2p5d_dense_core(img_height, img_width, n_channels, window_radius):
     skips = []
 
     for i, nf in enumerate(enc_feats):
-        x = layers.Conv2D(nf, 3, padding='same', name=f"enc{i}_conv")(x)
+        x = layers.Conv2D(nf, 3, padding='same', use_bias=False, name=f"enc{i}_conv")(x)
+        x = layers.BatchNormalization(name=f"enc{i}_bn")(x)
         x = layers.LeakyReLU(alpha=0.1, name=f"enc{i}_act")(x)
         skips.append(x)
 
         # Strided Conv for downsampling
-        x = layers.Conv2D(nf, 3, strides=2, padding='same', name=f"enc{i}_ds")(x)
+        x = layers.Conv2D(nf, 3, strides=2, padding='same', use_bias=False, name=f"enc{i}_ds")(x)
+        x = layers.BatchNormalization(name=f"enc{i}_ds_bn")(x)
         x = layers.LeakyReLU(alpha=0.1, name=f"enc{i}_ds_act")(x)
 
     # Bottleneck
-    x = layers.Conv2D(32, 3, padding='same', name="bottleneck_conv")(x)
+    x = layers.Conv2D(32, 3, padding='same', use_bias=False, name="bottleneck_conv")(x)
+    x = layers.BatchNormalization(name="bottleneck_bn")(x)
     x = layers.LeakyReLU(alpha=0.1, name="bottleneck_act")(x)
 
     # Decoder
     for i, skip in enumerate(reversed(skips)):
-        # Bilinear upsampling
-        x = layers.UpSampling2D(size=2, interpolation='bilinear', name=f"dec{i}_upsample")(x)
+        # Nearest-neighbor upsampling for DPU
+        x = layers.UpSampling2D(size=2, interpolation='nearest', name=f"dec{i}_upsample")(x)
         x = layers.Concatenate(name=f"dec{i}_concat")([x, skip])
         nf = skip.shape[-1]
-        x = layers.Conv2D(nf, 3, padding='same', name=f"dec{i}_conv")(x)
+        x = layers.Conv2D(nf, 3, padding='same', use_bias=False, name=f"dec{i}_conv")(x)
+        x = layers.BatchNormalization(name=f"dec{i}_bn")(x)
         x = layers.LeakyReLU(alpha=0.1, name=f"dec{i}_act")(x)
 
     # Final convolutions
-    x = layers.Conv2D(32, 3, padding='same', name="final_conv0")(x)
+    x = layers.Conv2D(32, 3, padding='same', use_bias=False, name="final_conv0")(x)
+    x = layers.BatchNormalization(name="final_conv0_bn")(x)
     x = layers.LeakyReLU(alpha=0.1, name="final_conv0_act")(x)
 
-    x = layers.Conv2D(16, 3, padding='same', name="final_conv1")(x)
+    x = layers.Conv2D(16, 3, padding='same', use_bias=False, name="final_conv1")(x)
+    x = layers.BatchNormalization(name="final_conv1_bn")(x)
     x = layers.LeakyReLU(alpha=0.1, name="final_conv1_act")(x)
 
     # Flow prediction (initialized to zero)

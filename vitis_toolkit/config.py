@@ -24,6 +24,8 @@ class PipelineConfig:
     # Advanced
     custom_objects_module: Optional[str] = None
     builder_fn_name: Optional[str] = None
+    input_shape: Optional[str] = None
+    target_class: Optional[str] = None
     skip_compile: bool = False
     visualize_graph: bool = True
     extra_compiler_args: List[str] = field(default_factory=list)

@@ -5,7 +5,7 @@ from pathlib import Path
 # Add toolkit to path if running from root
 sys.path.append(str(Path(__file__).parent))
 
-from vitis_toolkit import PipelineConfig, run_tf_pipeline
+from vitis_toolkit import PipelineConfig, run_tf_pipeline, run_pytorch_pipeline
 
 def main():
     print("Vitis AI Cross-Version Test Suite")
@@ -15,7 +15,8 @@ def main():
     
     # Models to test
     models = [
-        {"name": "vxm_2p5d_tf", "weights": "./Voxelmorph/trained_weights/2p5d_dense_tf_best_fixed.h5"}
+        {"name": "vxm_2p5d_tf", "framework": "tf", "weights": "./Voxelmorph/trained_weights/2p5d_dense_tf_best_fixed.h5"},
+        {"name": "vxm_2p5d_pt", "framework": "pt", "weights": "./Voxelmorph/trained_weights/2p5d_dense_pt_best.pth", "input_shape": "1,14,256,256"}
     ]
 
     for version in vitis_versions:
@@ -34,13 +35,15 @@ def main():
                 calib_dir="./Voxelmorph/2.5D/calibration_data",
                 calib_samples=16, 
                 custom_objects_module="brain_reg_models",
-                conda_env="vitis-ai-tensorflow2",
+                target_class="Vxm2p5dDenseCore",
+                input_shape=model_info.get("input_shape"),
+                conda_env="vitis-ai-pytorch" if model_info.get("framework") == "pt" else "vitis-ai-tensorflow2",
                 vitis_version=version,
                 visualize_graph=True
             )
 
             try:
-                exit_code = run_tf_pipeline(config)
+                exit_code = run_pytorch_pipeline(config) if model_info.get("framework") == "pt" else run_tf_pipeline(config)
                 
                 if exit_code == 0:
                     print(f"Success: Results in {output_path}")

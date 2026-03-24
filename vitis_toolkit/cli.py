@@ -54,8 +54,17 @@ def main():
              else:
                   from .pytorch_pipeline import PyTorchPipeline
                   pipeline = PyTorchPipeline(config)
-             
-             pipeline.run()
+                  
+                  shapes = None
+                  if getattr(config, 'input_shape', None):
+                      s = str(config.input_shape)
+                      shapes = [tuple(int(x) for x in p.split(',')) for p in s.split(';')] if ';' in s else [tuple(int(x) for x in s.split(','))]
+                  
+                  pipeline.run(
+                      model_module=config.custom_objects_module,
+                      model_class=getattr(config, 'target_class', None) or config.builder_fn_name,
+                      input_shape=shapes
+                  )
 
     elif args.command == "qat-prepare":
         if not args.config:

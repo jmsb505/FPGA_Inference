@@ -56,7 +56,7 @@ class PyTorchPipeline(Pipeline):
         model.eval()
         return model
 
-    def run_calibration(self, quant_model: torch.nn.Module, input_shape: Tuple[int, ...]) -> None:
+    def run_calibration(self, quant_model: torch.nn.Module, dummy_inputs: tuple) -> None:
         """
         Runs calibration. Uses custom_objects_module.get_calib_loader if available.
         """
@@ -78,10 +78,10 @@ class PyTorchPipeline(Pipeline):
         log(f"Running dummy calibration for {steps} steps...")
         with torch.no_grad():
             for _ in range(steps):
-                dummy = torch.randn(*input_shape)
-                _ = quant_model(dummy)
+                _ = quant_model(*dummy_inputs)
 
-    def quantize(self, model: Optional[torch.nn.Module] = None, input_shape: Tuple[int, ...] = (1, 1, 192, 224), **kwargs) -> Path:
+    def quantize(self, model: Optional[torch.nn.Module] = None, input_shape=None, **kwargs) -> Path:
+        if input_shape is None: input_shape = [(1, 1, 192, 224)]
         if torch_quantizer is None:
             raise RuntimeError("pytorch_nndct not found")
         
@@ -96,18 +96,21 @@ class PyTorchPipeline(Pipeline):
              model = self.load_model(kwargs.get("model_module"), kwargs.get("model_class"), self.config.float_model_path)
 
         # 2) Dummy input for tracing
-        dummy_input = torch.randn(*input_shape)
+        if isinstance(input_shape, list):
+            dummy_inputs = tuple(torch.randn(*s) for s in input_shape)
+        else:
+            dummy_inputs = (torch.randn(*input_shape),)
 
         # === CALIBRATION PHASE ===
         quantizer = torch_quantizer(
             "calib",
             model,
-            (dummy_input,),
+            dummy_inputs,
             output_dir=str(xir_dir),
         )
         quant_model = quantizer.quant_model
 
-        self.run_calibration(quant_model, input_shape)
+        self.run_calibration(quant_model, dummy_inputs)
 
         quantizer.export_quant_config()
 
@@ -149,8 +152,12 @@ class PyTorchPipeline(Pipeline):
         return xmodels[0]
 
 
-def parse_shape(shape_str: str) -> Tuple[int, ...]:
-    return tuple(int(x) for x in shape_str.split(","))
+def parse_shape(shape_str: str):
+    if ';' in shape_str:
+        return [tuple(int(x) for x in s.split(',')) for s in shape_str.split(';')]
+    elif ':' in shape_str:
+        return [tuple(int(x) for x in s.split(',')) for s in shape_str.split(':')]
+    return [tuple(int(x) for x in shape_str.split(','))]
 
 
 def main():
