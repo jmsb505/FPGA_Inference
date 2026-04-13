@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
@@ -29,7 +29,6 @@ class PipelineConfig:
     skip_compile: bool = False
     visualize_graph: bool = True
     extra_compiler_args: List[str] = field(default_factory=list)
-    
     # Framework specific
     conda_env: Optional[str] = None # For orchestrator
     vitis_version: str = "2.5"      # For orchestrator image selection
@@ -52,4 +51,5 @@ class PipelineConfig:
 
     @classmethod
     def from_dict(cls, data: dict):
-        return cls(**data)
+        allowed = {item.name for item in fields(cls)}
+        return cls(**{k: v for k, v in data.items() if k in allowed})

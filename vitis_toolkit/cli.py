@@ -3,8 +3,16 @@ import sys
 import yaml
 import json
 from pathlib import Path
-from .config import PipelineConfig
-from .orchestrator import VitisDockerOrchestrator
+
+if __package__ in (None, ""):
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+    from vitis_toolkit.config import PipelineConfig
+    from vitis_toolkit.orchestrator import VitisDockerOrchestrator
+else:
+    from .config import PipelineConfig
+    from .orchestrator import VitisDockerOrchestrator
 
 def load_config(path: Path) -> PipelineConfig:
     with open(path, "r") as f:
@@ -43,16 +51,22 @@ def main():
         if args.host:
              # Orchestrate from host
              orchestrator = VitisDockerOrchestrator()
-             cmd = f"python toolkit/vitis_toolkit/cli.py run --config {args.config}"
+             cmd = f"python /workspace/vitis_toolkit/cli.py run --config {args.config}"
              orchestrator.run(cmd, conda_env=config.conda_env)
         else:
              # Run locally (assumed to be inside container)
              # Determine framework and run
              if ".h5" in str(config.float_model_path):
-                  from .tf_pipeline import TensorFlowPipeline
+                  if __package__ in (None, ""):
+                      from vitis_toolkit.tf_pipeline import TensorFlowPipeline
+                  else:
+                      from .tf_pipeline import TensorFlowPipeline
                   pipeline = TensorFlowPipeline(config)
              else:
-                  from .pytorch_pipeline import PyTorchPipeline
+                  if __package__ in (None, ""):
+                      from vitis_toolkit.pytorch_pipeline import PyTorchPipeline
+                  else:
+                      from .pytorch_pipeline import PyTorchPipeline
                   pipeline = PyTorchPipeline(config)
                   
                   shapes = None
@@ -71,7 +85,10 @@ def main():
             print("Error: --config is required for 'qat-prepare'")
             sys.exit(1)
         config = load_config(args.config)
-        from .tf_pipeline import TensorFlowPipeline
+        if __package__ in (None, ""):
+            from vitis_toolkit.tf_pipeline import TensorFlowPipeline
+        else:
+            from .tf_pipeline import TensorFlowPipeline
         pipeline = TensorFlowPipeline(config)
         qat_path = pipeline.qat_prepare()
         print(f"QAT model saved to: {qat_path}")

@@ -6,7 +6,7 @@ It extracts slice stacks from DIFFERENT subjects (cross-subject pairs) matching
 the training setup where moving MR and fixed CT come from different subjects.
 
 Usage:
-    python prepare_calibration_data.py --num_samples 100 --output_dir ./calibration_data
+    python prepare_calibration_data.py --num_samples 100 --output_dir ./data/calibration_data
 """
 
 import os
@@ -34,6 +34,32 @@ def _load_pyc(name):
 _load_pyc('tuco_dataset')
 from tuco_dataset import TucoDataset
 from torch.utils.data import Subset
+
+
+def normalize_to_contract(volume: np.ndarray):
+    """
+    Normalize to the runtime parity contract [-1, 1].
+
+    Modes:
+      - already_-1_1: data already in [-1, 1]
+      - zero_one_to_minus_one_one: convert [0, 1] -> [-1, 1]
+      - minmax_to_minus_one_one: fallback min-max normalize to [-1, 1]
+      - constant_zero: flat volume -> zeros
+    """
+    vol = volume.astype(np.float32)
+    vmin = float(vol.min())
+    vmax = float(vol.max())
+
+    if vmax <= vmin:
+        return np.zeros_like(vol, dtype=np.float32), "constant_zero"
+
+    if vmin >= -1.001 and vmax <= 1.001:
+        if vmin >= -1e-4 and vmax <= 1.0001:
+            return (2.0 * vol - 1.0).astype(np.float32), "zero_one_to_minus_one_one"
+        return vol.astype(np.float32), "already_-1_1"
+
+    out = 2.0 * (vol - vmin) / (vmax - vmin) - 1.0
+    return out.astype(np.float32), "minmax_to_minus_one_one"
 
 
 # Configuration matching the training setup
@@ -65,13 +91,19 @@ def load_training_volumes(data_root, max_subjects=None):
         ds = Subset(ds, range(min(max_subjects, len(ds))))
 
     mr_vols, ct_vols = [], []
+    norm_mode_counts = {}
     for i, sample in enumerate(ds):
         if i % 10 == 0:
             print(f"  Loading volume {i+1}/{len(ds)}...")
-        mr_vols.append(sample['moving'].squeeze(0).numpy().astype(np.float32))
-        ct_vols.append(sample['fixed'].squeeze(0).numpy().astype(np.float32))
+        mr, mr_mode = normalize_to_contract(sample['moving'].squeeze(0).numpy())
+        ct, ct_mode = normalize_to_contract(sample['fixed'].squeeze(0).numpy())
+        mr_vols.append(mr)
+        ct_vols.append(ct)
+        norm_mode_counts[mr_mode] = norm_mode_counts.get(mr_mode, 0) + 1
+        norm_mode_counts[ct_mode] = norm_mode_counts.get(ct_mode, 0) + 1
 
     print(f"Loaded {len(mr_vols)} training volumes")
+    print(f"Normalization modes: {norm_mode_counts}")
     return mr_vols, ct_vols
 
 
@@ -173,6 +205,7 @@ def save_calibration_data(samples, output_dir):
         'window_radius': WINDOW_RADIUS,
         'n_stack': N_STACK,
         'input_channels': 14,
+        'normalization_contract': '[-1, 1]',
         'downsample': DOWNSAMPLE,
         'shape_info': f"Each input: (14, H, W) where H,W vary by orientation",
         'orientations': [c[2] for c in ORIENT_CONFIG]
@@ -191,7 +224,7 @@ def main():
     parser = argparse.ArgumentParser(description='Prepare calibration dataset for Vitis AI quantization')
     parser.add_argument('--num_samples', type=int, default=100,
                         help='Number of calibration samples to generate (default: 100)')
-    parser.add_argument('--output_dir', type=str, default='./calibration_data',
+    parser.add_argument('--output_dir', type=str, default='./data/calibration_data',
                         help='Output directory for calibration data')
     parser.add_argument('--max_subjects', type=int, default=None,
                         help='Maximum number of training subjects to load (default: all)')
@@ -241,7 +274,7 @@ def main():
 
     print("\nNext steps:")
     print("  1. Use this calibration data with your Vitis AI quantization pipeline")
-    print("  2. Load individual samples from calibration_data/inputs/input_*.npy")
+    print("  2. Load individual samples from data/calibration_data/inputs/input_*.npy")
     print("  3. Each sample is a (14, H, W) array ready for the model")
     print("  4. This matches the training distribution (cross-subject registration)")
 

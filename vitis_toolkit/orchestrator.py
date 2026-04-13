@@ -1,6 +1,7 @@
 import os
 import subprocess
 import getpass
+import shutil
 from pathlib import Path
 from typing import List, Optional
 
@@ -63,6 +64,18 @@ class VitisDockerOrchestrator:
         self.user = getpass.getuser()
         self.uid = os.getuid()
         self.gid = os.getgid()
+        self.docker_bin = self._resolve_docker_bin()
+
+    def _resolve_docker_bin(self) -> str:
+        for candidate in (
+            shutil.which("docker"),
+            shutil.which("docker.exe"),
+            "/mnt/c/Program Files/Docker/Docker/resources/bin/docker.exe",
+            "/mnt/c/Program Files/Docker/Docker/resources/bin/docker",
+        ):
+            if candidate and Path(candidate).exists():
+                return candidate
+        return "docker"
 
     def _get_docker_devices(self) -> List[str]:
         """Replicate the device discovery logic from docker_run.sh"""
@@ -89,7 +102,7 @@ class VitisDockerOrchestrator:
         """
         Build the 'docker run' command.
         """
-        docker_cmd = ["docker", "run", "--rm"]
+        docker_cmd = [self.docker_bin, "run", "--rm"]
         
         if interactive:
             docker_cmd.append("-it")
@@ -115,7 +128,7 @@ class VitisDockerOrchestrator:
             "-e", f"USER={self.user}",
             "-e", f"UID={self.uid}",
             "-e", f"GID={self.gid}",
-            "-e", "PYTHONPATH=$PYTHONPATH:/workspace",
+            "-e", "PYTHONPATH=/workspace",
             "-e", "TF_CPP_MIN_LOG_LEVEL=3",
             "-w", "/workspace",
             "--network=host"
@@ -133,9 +146,12 @@ class VitisDockerOrchestrator:
                 # In Vitis AI Docker, conda is usually at /opt/vitis_ai/conda
                 # We source the profile to ensure conda is initialized in the shell
                 conda_init = "source /opt/vitis_ai/conda/etc/profile.d/conda.sh"
-                full_command = f"{conda_init} && conda run --no-capture-output -n {conda_env} {command}"
+                full_command = (
+                    f"cd /workspace && export PYTHONPATH=/workspace && "
+                    f"{conda_init} && conda run --cwd /workspace --no-capture-output -n {conda_env} {command}"
+                )
             else:
-                full_command = command
+                full_command = f"cd /workspace && export PYTHONPATH=/workspace && {command}"
             docker_cmd.extend(["bash", "-c", full_command])
         else:
             docker_cmd.append("bash")

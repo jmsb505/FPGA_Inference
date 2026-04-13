@@ -26,7 +26,7 @@ def run_tf_pipeline(config: PipelineConfig, **kwargs) -> int:
     
     # Run the internal CLI, ensuring we use relative path from workspace root
     rel_config_path = config_path.relative_to(orchestrator.workspace.resolve())
-    cmd = f"python -m vitis_toolkit.cli run --config {rel_config_path}"
+    cmd = f"python /workspace/vitis_toolkit/cli.py run --config {rel_config_path}"
     return orchestrator.run(cmd, conda_env=config.conda_env or "vitis-ai-tensorflow2")
 
 def run_pytorch_pipeline(config: PipelineConfig, **kwargs) -> int:
@@ -47,7 +47,7 @@ def run_pytorch_pipeline(config: PipelineConfig, **kwargs) -> int:
         json.dump(config.to_dict(), f)
         
     rel_config_path = config_path.relative_to(orchestrator.workspace.resolve())
-    cmd = f"python -m vitis_toolkit.cli run --config {rel_config_path}"
+    cmd = f"python /workspace/vitis_toolkit/cli.py run --config {rel_config_path}"
     return orchestrator.run(cmd, conda_env=config.conda_env or "vitis-ai-pytorch")
 
 def run_qat_prepare(config: PipelineConfig, **kwargs) -> int:
@@ -69,7 +69,7 @@ def run_qat_prepare(config: PipelineConfig, **kwargs) -> int:
         json.dump(config.to_dict(), f)
 
     rel_config_path = config_path.relative_to(orchestrator.workspace.resolve())
-    cmd = f"python -m vitis_toolkit.cli qat-prepare --config {rel_config_path}"
+    cmd = f"python /workspace/vitis_toolkit/cli.py qat-prepare --config {rel_config_path}"
     return orchestrator.run(cmd, conda_env=config.conda_env or "vitis-ai-tensorflow2")
 
 __all__ = ["PipelineConfig", "Pipeline", "VitisDockerOrchestrator", "run_tf_pipeline", "run_pytorch_pipeline", "run_qat_prepare"]

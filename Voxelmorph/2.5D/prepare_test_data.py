@@ -55,7 +55,7 @@ def main():
                         help='Subject ID for moving MR volume (e.g., 1BA001)')
     parser.add_argument('--ct_subject', type=str, default='1BA002',
                         help='Subject ID for fixed CT volume (e.g., 1BA002) - MUST be different from mr_subject')
-    parser.add_argument('--output_dir', type=str, default='./test_data',
+    parser.add_argument('--output_dir', type=str, default='./data/test_data',
                         help='Output directory for test data')
 
     args = parser.parse_args()

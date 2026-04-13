@@ -23,15 +23,33 @@ out/
 **/evaluation_results/
 results.json
 *.png
+Voxelmorph/2.5D/artifacts/
+Voxelmorph/2.5D/parity/artifacts/
+Voxelmorph/2.5D/data/cache/
+Voxelmorph/2.5D/data/calibration_data/
 
 # Python & IDE
 __pycache__/
 **/__pycache__/
 .pytest_cache/
 .claude/
+.codex
 .ipynb_checkpoints/
 .DS_Store
 # Documents
 *.pdf
 *.md
+!CONTEXT.md
 !README.md
+!Voxelmorph/2.5D/README.md
+!Voxelmorph/2.5D/docs/**/*.md
+!Voxelmorph/2.5D/parity/**/*.md
+
+# Tracked V2 checkpoints
+!Voxelmorph/trained_weights/
+!Voxelmorph/trained_weights/2p5d_pt_v2_checkpoints/
+!Voxelmorph/trained_weights/3d_pt_v2_checkpoints/
+!Voxelmorph/trained_weights/2p5d_dense_pt_v2_best.pth
+!Voxelmorph/trained_weights/3d_dense_v2_best.pth
+!Voxelmorph/trained_weights/2p5d_pt_v2_checkpoints/2p5d_pt_v2_latest.pth
+!Voxelmorph/trained_weights/3d_pt_v2_checkpoints/3d_pt_v2_latest.pth

@@ -41,18 +41,33 @@ class PyTorchPipeline(Pipeline):
     def load_model(self, module_name: str, class_name: str, checkpoint: Path) -> torch.nn.Module:
         log(f"Loading model {module_name}.{class_name} from {checkpoint}")
         module = importlib.import_module(module_name)
+        if not class_name and not hasattr(module, "load_model_for_export"):
+            raise ValueError("target_class or builder_fn_name must be provided for PyTorch export")
+        if hasattr(module, "load_model_for_export"):
+            model = module.load_model_for_export(
+                checkpoint=checkpoint,
+                config=self.config,
+                class_name=class_name,
+            )
+            if not isinstance(model, torch.nn.Module):
+                raise TypeError(f"{module_name}.load_model_for_export did not return a torch.nn.Module")
+            log("Weights loaded successfully")
+            model.eval()
+            return model
+
         model_cls = getattr(module, class_name)
         model = model_cls()
-
         state = torch.load(checkpoint, map_location="cpu")
+
+        if isinstance(state, dict) and "state_dict" in state:
+            state = state["state_dict"]
+
         if hasattr(model, "net") and isinstance(state, dict):
-            model.net.load_state_dict(state)
+            model.net.load_state_dict(state, strict=True)
         else:
-            if isinstance(state, dict) and "state_dict" in state:
-                model.load_state_dict(state["state_dict"])
-            else:
-                model.load_state_dict(state)
-        
+            model.load_state_dict(state, strict=True)
+
+        log("Weights loaded successfully")
         model.eval()
         return model
 
@@ -81,7 +96,8 @@ class PyTorchPipeline(Pipeline):
                 _ = quant_model(*dummy_inputs)
 
     def quantize(self, model: Optional[torch.nn.Module] = None, input_shape=None, **kwargs) -> Path:
-        if input_shape is None: input_shape = [(1, 1, 192, 224)]
+        if input_shape is None:
+            raise ValueError("input_shape must be provided explicitly in PipelineConfig.")
         if torch_quantizer is None:
             raise RuntimeError("pytorch_nndct not found")
         
@@ -92,7 +108,6 @@ class PyTorchPipeline(Pipeline):
         if model is None:
              if not self.config.float_model_path:
                  raise ValueError("model or config.float_model_path must be provided")
-             # Fallback to old loading logic if module/class provided in kwargs
              model = self.load_model(kwargs.get("model_module"), kwargs.get("model_class"), self.config.float_model_path)
 
         # 2) Dummy input for tracing
@@ -114,14 +129,27 @@ class PyTorchPipeline(Pipeline):
 
         quantizer.export_quant_config()
 
-        # === EXPORT XMODEL ===
-        try:
-            quantizer.export_xmodel(output_dir=str(xir_dir), deploy_check=False)
-        except TypeError:
-            quantizer.export_xmodel(deploy_check=False)
+        # === EXPORT XMODEL (Using 'test' mode for Vitis AI 2.5 compatibility) ===
+        log("Reloading float model for clean 'test' mode export...")
+        model = self.load_model(kwargs.get("model_module"), kwargs.get("model_class"), self.config.float_model_path)
+
+        log("Re-initializing quantizer in 'test' mode for .xmodel export...")
+        test_quantizer = torch_quantizer(
+            "test",
+            model,
+            dummy_inputs,
+            output_dir=str(xir_dir),
+        )
+        
+        log("Exporting .xmodel...")
+        test_quantizer.export_xmodel(output_dir=str(xir_dir), deploy_check=False)
 
         xmodels = sorted(xir_dir.glob("*.xmodel"))
         if not xmodels:
+            # Check current directory just in case
+            cwd_xmodels = list(Path(".").glob("*.xmodel"))
+            if cwd_xmodels:
+                return cwd_xmodels[0]
             raise RuntimeError(f"No .xmodel generated in {xir_dir}")
 
         int_candidates = [p for p in xmodels if p.stem.endswith("_int")]
@@ -193,4 +221,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
