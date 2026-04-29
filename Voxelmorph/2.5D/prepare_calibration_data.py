@@ -16,22 +16,11 @@ import numpy as np
 import torch
 from pathlib import Path
 
-# Add parent directory to path to import tuco_dataset
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+# Add Voxelmorph root to path to import tuco_dataset
+VOXELMORPH_ROOT = Path(__file__).resolve().parents[1]
+if str(VOXELMORPH_ROOT) not in sys.path:
+    sys.path.insert(0, str(VOXELMORPH_ROOT))
 
-import importlib.util
-_pyc_dir = os.path.abspath(os.path.join('..', '__pycache__'))
-
-def _load_pyc(name):
-    pyc = os.path.join(_pyc_dir, f'{name}.cpython-310.pyc')
-    if not os.path.exists(pyc):
-        raise FileNotFoundError(f"Cannot find {pyc}. Please run the training notebook first to generate it.")
-    spec = importlib.util.spec_from_file_location(name, pyc)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    sys.modules[name] = mod
-
-_load_pyc('tuco_dataset')
 from tuco_dataset import TucoDataset
 from torch.utils.data import Subset
 
