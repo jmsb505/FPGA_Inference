@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).parent))
 from vitis_toolkit import PipelineConfig, run_tf_pipeline, run_pytorch_pipeline
 
 
-CANONICAL_WEIGHTS = "./Voxelmorph/trained_weights/2p5d_dense_pt_best.pth"
+CANONICAL_WEIGHTS = "./Voxelmorph/trained_weights/2p5d_dense_pt_v2_best.pth"
 CANONICAL_INPUT_SHAPE = "1,112,96,16"
 CANONICAL_CALIB_DIR = "./Voxelmorph/2.5D/data/calibration_data"
 CANONICAL_OUTPUT_ROOT = "./out/v2.5/vxm_2p5d_pt_v3"
@@ -16,7 +16,16 @@ CANONICAL_NET_NAME = "vxm_2p5d_pt_v3"
 CANONICAL_MODEL_MODULE = "vxm_2p5d_export"
 CANONICAL_MODEL_CLASS = "Vxm2p5dDenseCore"
 
+import argparse
+
 def main():
+    parser = argparse.ArgumentParser(description="Vitis AI Cross-Version Test Suite")
+    parser.add_argument("--weights", type=str, default=CANONICAL_WEIGHTS, help="Path to PyTorch float weights (.pth)")
+    parser.add_argument("--input_shape", type=str, default=CANONICAL_INPUT_SHAPE, help="Network input shape in format N,H,W,C")
+    parser.add_argument("--net_name", type=str, default=CANONICAL_NET_NAME, help="Name of compiled network")
+    parser.add_argument("--output_root", type=str, default=CANONICAL_OUTPUT_ROOT, help="Output directory root path")
+    args = parser.parse_args()
+
     print("Vitis AI Cross-Version Test Suite")
     
     # Versions to test
@@ -24,11 +33,11 @@ def main():
     
     # Models to test
     models = [{
-        "name": CANONICAL_NET_NAME,
+        "name": args.net_name,
         "framework": "pt",
-        "weights": CANONICAL_WEIGHTS,
-        "input_shape": CANONICAL_INPUT_SHAPE,
-        "output_root": CANONICAL_OUTPUT_ROOT,
+        "weights": args.weights,
+        "input_shape": args.input_shape,
+        "output_root": args.output_root,
         "model_module": CANONICAL_MODEL_MODULE,
         "model_class": CANONICAL_MODEL_CLASS,
     }]
@@ -70,3 +79,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
