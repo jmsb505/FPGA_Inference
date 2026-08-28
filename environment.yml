@@ -1,0 +1,27 @@
+name: gen
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - ipykernel
+  - notebook
+  - pip:
+      - h5py
+      - matplotlib
+      - nibabel
+      - numpy
+      - nvidia-ml-py3
+      - opencv-python
+      - pandas
+      - psutil
+      - pyRAPL
+      - scikit-image
+      - scipy
+      - torch
+      - torchvision
+      - tqdm
+
+# Vitis AI/NNDCT and the FPGA runtime are supplied by the matching
+# Vitis AI container and board image, not by this host Conda environment.

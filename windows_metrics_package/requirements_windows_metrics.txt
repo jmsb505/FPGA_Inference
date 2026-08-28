@@ -1,0 +1,10 @@
+wmi; platform_system == "Windows"
+pywin32; platform_system == "Windows"
+nvidia-ml-py
+nibabel
+numpy
+opencv-python
+scipy
+matplotlib
+ipython
+psutil

@@ -1,0 +1,19 @@
+{
+  "version": "v4-canonical-3d",
+  "model": "Vxm2p5dV4",
+  "fpga_input_shape": [1, 112, 96, 16],
+  "fpga_input_layout": "NHWC: eight moving slices followed by eight fixed slices",
+  "internal_layout": "NCHW",
+  "orientation_policy": {
+    "axial": "112x96 plane after canonical 3D resampling",
+    "coronal": "96x96 plane, centered top/bottom letterbox padding",
+    "sagittal": "96x112 plane, transpose H/W to 112x96"
+  },
+  "canonical_volume_shape": [96, 112, 96],
+  "resize_policy": "resample images trilinearly and segmentations with nearest neighbor to the canonical 3D grid, then apply orientation canonicalization and centered constant padding",
+  "image_pad_value": -1.0,
+  "segmentation_pad_value": 0,
+  "normalization_contract": "[-1, 1] before letterboxing",
+  "flow_units": "pixels on the 112x96 grid; inverse geometry must be applied before orientation fusion or TRE",
+  "calibration_contract": "same fixed-grid preprocessing as training and inference"
+}

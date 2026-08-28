@@ -1,55 +1,91 @@
-# Data & Weights
-Data/
-test_data/
-trained_weights/
-trained_weights_tf/
+# Private data and generated tensors
+/Data/*
+!/Data/README.md
+/test_data/
+/trained_weights/
+/trained_weights_tf/
+Voxelmorph/2.5D/data/
+Voxelmorph/trained_weights/
 **/checkpoints/
-**/3d_checkpoints/
-**/2p5d_checkpoints/
-**/2p5d_tf_checkpoints/
 **/test_data/
 **/trained_weights/
+**/evaluation_results/
+**/gpu_results/
 *.npy
 *.npz
 *.h5
 *.pth
+
+# Vitis AI and board build products
+/out/
+/fpga_results_v4_canonical/
+*.xmodel
+*.bit
 *.tar.gz
+
+# Generated measurements, figures, and transfer bundles
+/artifacts/
+/jupyter/
+/tmp/
+/windows_metrics_bundle/
+/windows_metrics_bundle.zip
+/windows_metrics_package.zip
+/windows_metrics_report.json
+/project_documentation_*.zip
+*.png
+*.svg
 *.zip
 
-# Generated Artifacts & Results
-out/
-*.xmodel
-**/gpu_results/
-**/evaluation_results/
-results.json
-*.png
-Voxelmorph/2.5D/artifacts/
-Voxelmorph/2.5D/parity/artifacts/
-Voxelmorph/2.5D/data/cache/
-Voxelmorph/2.5D/data/calibration_data/
+# Preserve compact, canonical result sources only
+Voxelmorph/artifacts/*
+!Voxelmorph/artifacts/results/
+Voxelmorph/artifacts/results/*
 
-# Python & IDE
+!Voxelmorph/artifacts/results/compare_2p5d_v4_fusion_3d_v2_test/
+Voxelmorph/artifacts/results/compare_2p5d_v4_fusion_3d_v2_test/*
+!Voxelmorph/artifacts/results/compare_2p5d_v4_fusion_3d_v2_test/benchmark_results_comparison_v4_local.json
+!Voxelmorph/artifacts/results/compare_2p5d_v4_fusion_3d_v2_test/v4_vs_3d_rows.json
+!Voxelmorph/artifacts/results/compare_2p5d_v4_fusion_3d_v2_test/benchmark_summary_v4_local.md
+
+!Voxelmorph/artifacts/results/compare_v4_local_fpga_results/
+Voxelmorph/artifacts/results/compare_v4_local_fpga_results/*
+!Voxelmorph/artifacts/results/compare_v4_local_fpga_results/v4_complete_results_analysis.md
+!Voxelmorph/artifacts/results/compare_v4_local_fpga_results/v4_local_fpga_comparison_summary.md
+!Voxelmorph/artifacts/results/compare_v4_local_fpga_results/v4_platform_method_summary.csv
+!Voxelmorph/artifacts/results/compare_v4_local_fpga_results/v4_platform_pair_metrics.csv
+
+!Voxelmorph/artifacts/results/inference_only_local_power_latency/
+Voxelmorph/artifacts/results/inference_only_local_power_latency/*
+!Voxelmorph/artifacts/results/inference_only_local_power_latency/common_idle_calibration.json
+!Voxelmorph/artifacts/results/inference_only_local_power_latency/local_2p5d_3d_cpu_gpu_9_pairs.json
+
+!Voxelmorph/artifacts/results/inference_pipeline_breakdown/
+Voxelmorph/artifacts/results/inference_pipeline_breakdown/*
+!Voxelmorph/artifacts/results/inference_pipeline_breakdown/fpga_board_9_pairs.json
+!Voxelmorph/artifacts/results/inference_pipeline_breakdown/inference_pipeline_power_latency_v4.json
+!Voxelmorph/artifacts/results/inference_pipeline_breakdown/local_gpu_9_pairs.json
+
+!Voxelmorph/artifacts/results/presentation_inputs/
+Voxelmorph/artifacts/results/presentation_inputs/*
+!Voxelmorph/artifacts/results/presentation_inputs/presentation_resource_metrics_v4.json
+
+# Python, notebooks, editors, and local agent state
 __pycache__/
 **/__pycache__/
 .pytest_cache/
-.claude/
-.codex
 .ipynb_checkpoints/
+.claude/
+/.agents
+/.agents/
+/.codex
+/.codex/
+/AGENTS.md
+/CONTEXT.md
+.MambaMorph/
 .DS_Store
-# Documents
+*.py[cod]
 *.pdf
-*.md
-!CONTEXT.md
-!README.md
-!Voxelmorph/2.5D/README.md
-!Voxelmorph/2.5D/docs/**/*.md
-!Voxelmorph/2.5D/parity/**/*.md
 
-# Tracked V2 checkpoints
-!Voxelmorph/trained_weights/
-!Voxelmorph/trained_weights/2p5d_pt_v2_checkpoints/
-!Voxelmorph/trained_weights/3d_pt_v2_checkpoints/
-!Voxelmorph/trained_weights/2p5d_dense_pt_v2_best.pth
-!Voxelmorph/trained_weights/3d_dense_v2_best.pth
-!Voxelmorph/trained_weights/2p5d_pt_v2_checkpoints/2p5d_pt_v2_latest.pth
-!Voxelmorph/trained_weights/3d_pt_v2_checkpoints/3d_pt_v2_latest.pth
+# Windows download/security metadata
+*:Zone.Identifier
+*:mshield

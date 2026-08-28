@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "scope": "V4 presentation resource comparison",
+  "models": {
+    "2p5d_mean_fused": {
+      "parameter_count": 137621,
+      "cuda_peak_memory_mb_mean": 110.3984375
+    },
+    "3d_v2": {
+      "parameter_count": 313507,
+      "cuda_peak_memory_mb_mean": 1745.60546875
+    }
+  },
+  "notes": {
+    "parameter_count": "Trainable model parameters.",
+    "cuda_peak_memory": "Mean peak CUDA allocation across nine aligned GPU pairs."
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "duration_s": 20.020188616999803,
+  "sample_interval_s": 0.2,
+  "cpu": {
+    "sensor": "AMD CPU PPT/package power from LibreHardwareMonitor web API",
+    "mean_w": 54.06913580246913,
+    "sd_w": 9.763537294127943,
+    "peak_w": 79.6,
+    "samples": 81
+  },
+  "gpu": {
+    "sensor": "NVIDIA GPU board power from nvidia-smi",
+    "mean_w": 12.68530864197531,
+    "sd_w": 0.2017615326304365,
+    "peak_w": 13.05,
+    "samples": 81
+  }
+}

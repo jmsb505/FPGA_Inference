@@ -118,7 +118,11 @@ def _pad_first_layer_if_needed(state, model):
     if ckpt_w.shape[1] != 14 or model_w.shape[1] != 16:
         return state
     new_w = torch.zeros_like(model_w)
-    new_w[:, :14, :, :] = ckpt_w
+    # The board export contract is [moving(8), fixed(8)], while the V2
+    # training checkpoint is [moving(7), fixed(7)]. Keep the duplicate pad
+    # channels zero so the export wrapper is numerically equivalent to V2.
+    new_w[:, :7, :, :] = ckpt_w[:, :7, :, :]
+    new_w[:, 8:15, :, :] = ckpt_w[:, 7:14, :, :]
     state = dict(state)
     state[key] = new_w
     return state
