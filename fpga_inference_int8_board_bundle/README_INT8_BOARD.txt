@@ -5,10 +5,11 @@ This bundle measures the software-quantized INT8 reference model on the FPGA boa
 
 Contents:
 - fpga_inference_int8.ipynb      : Self-contained notebook to run the INT8 ARM CPU benchmark.
-- vxm_2p5d_export.py             : PyTorch 2.5D model definition and INT8 quantization loader.
+- vxm_2p5d_export.py             : 2.5D model loader wrapper with ONNX Runtime INT8 quantized execution support.
 - fpga_deployment_timing.py      : V4 metric-free timing helper module.
 - fpga_deployment_power.py       : V4 power and PYNQ rail telemetry helper module.
 - 2p5d_dense_pt_v4_canonical_best.pth : PyTorch canonical V4 model checkpoint.
+- 2p5d_dense_v4_int8.onnx         : ONNX Runtime dynamic INT8 quantized model (true 8-bit ConvInteger ops).
 - BUNDLE_MANIFEST.json           : Manifest listing all files in this bundle.
 
 How to Run on Board:

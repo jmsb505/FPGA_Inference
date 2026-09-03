@@ -11,6 +11,7 @@
     "vxm_2p5d_export.py",
     "fpga_deployment_timing.py",
     "fpga_deployment_power.py",
-    "2p5d_dense_pt_v4_canonical_best.pth"
+    "2p5d_dense_pt_v4_canonical_best.pth",
+    "2p5d_dense_v4_int8.onnx"
   ]
 }
