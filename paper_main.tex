@@ -1,0 +1,260 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{url}
+\usepackage{hyperref}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Accelerating Volumetric Medical Image Registration on Edge FPGAs via Fixed-Grid 2.5D VoxelMorph and Vitis AI}
+
+\author{
+\IEEEauthorblockN{Felipe Puente C. and Juan Mart\'in S\'anchez}
+\IEEEauthorblockA{\textit{Department of Electronics, Information and Bioengineering} \\
+\textit{Politecnico di Milano}, Milan, Italy\\
+felipeesteban.puente@mail.polimi.it, juanmartin.sanchez@mail.polimi.it}
+}
+
+\maketitle
+
+\begin{abstract}
+Deformable 3D medical image registration (such as aligning intraoperative Magnetic Resonance [MR] and Computed Tomography [CT] brain scans) is essential for image-guided clinical interventions. However, executing full 3D Deep Neural Networks (DNNs) on embedded hardware is severely constrained by massive memory allocations, high memory bandwidth demands, and strict thermal power limits. In this paper, we present an end-to-end hardware/software co-design framework for deploying volumetric 2.5D VoxelMorph deformable image registration on an AMD/Xilinx MPSoC FPGA utilizing Vitis AI 2.5.
+
+To satisfy static DPU vectorization requirements without introducing spatial anatomical distortion, we engineer a fixed-grid geometry contract ($112 \times 96 \times 16$) featuring orientation-aware letterbox padding, 16-channel SIMD alignment, and canonical volume resampling. Dense 2D U-Net feature extraction is hardware-accelerated on the Deep Learning Processing Unit (DPU) systolic array, while sparse 3D vector field lifting, multi-view mean fusion, and volume warping are executed on the host ARM CPU. Across nine held-out patient volume pairs (16 anatomical brain regions), the quantized INT8 DPU model achieves a Dice score of \textbf{0.7647} and a Target Registration Error (TRE) of \textbf{2.025~mm}, matching floating-point software references ($0.7638$ Dice, $2.008$~mm TRE) and outperforming full 3D desktop models ($0.7609$ Dice, $2.111$~mm TRE) while reducing peak memory footprint by over $15\times$. The FPGA DPU achieves a \textbf{16.2$\times$ speedup} in neural network inference latency ($1,822.5$~ms vs $29,472.1$~ms on ARM CPU for 3-view fusion) and a \textbf{38.5\% reduction in dynamic energy consumption} during volumetric evaluation. Finally, we analyze host-side processing bottlenecks ($>95\%$ runtime) and establish design guidelines for edge medical accelerators.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Volumetric Image Registration, Medical Image Processing, VoxelMorph, FPGA Acceleration, 2.5D Deep Learning, Vitis AI, Edge Computing, Hardware/Software Co-Design.
+\end{IEEEkeywords}
+
+% =========================================================================
+\section{Introduction}
+\label{sec:intro}
+
+Deformable Medical Image Registration (DIR) is a foundational computational task in modern clinical workflows, enabling precise spatial alignment of 3D anatomical volumes acquired from distinct imaging modalities (such as Magnetic Resonance Imaging [MRI] and Computed Tomography [CT]). Multi-modal MR-to-CT alignment is critical for neurosurgical planning, targeted radiation therapy, and longitudinal disease monitoring.
+
+Traditional registration techniques rely on iterative optimization algorithms (e.g., SyN or Demons) that solve complex objective functions over thousands of iterations. While accurate, these methods incur high computational latencies, often requiring several minutes per patient volume. Recently, deep-learning models such as VoxelMorph~\cite{balakrishnan2019voxelmorph} have transformed DIR by parameterizing deformable alignment with Convolutional Neural Networks (CNNs), predicting dense 3D deformation flow fields in a single forward pass.
+
+Despite their algorithmic speed on high-power desktop GPUs, deploying 3D neural registration models on compact edge platforms (e.g., portable scanners, operating room carts, or embedded point-of-care devices) introduces severe engineering challenges:
+\begin{enumerate}
+    \item \textbf{High Memory Allocation \& Bandwidth}: Full 3D convolutional networks require storing large 5D intermediate feature tensors, driving peak RAM allocations over $1.7$~GB. This far exceeds the on-chip SRAM capacity of embedded systems and creates severe external DRAM bandwidth bottlenecks.
+    \item \textbf{Strict Thermal Power Envelopes}: Operating room environments require low-power execution ($<15$~W TDP), ruling out high-power desktop GPUs.
+    \item \textbf{Rigid Hardware Vectorization Contracts}: Field Programmable Gate Arrays (FPGAs) equipped with Deep Learning Processing Units (DPUs) offer outstanding energy efficiency, but enforce static tensor dimensions, 8-bit integer (INT8) quantization, and restricted operator sets (e.g., lack of native 3D convolution support).
+\end{enumerate}
+
+To overcome these barriers, this project investigates a \textit{2.5D multi-view registration architecture} that reformulates 3D volumetric registration into lightweight 2D slice stack processing across three orthogonal planes (Axial, Coronal, Sagittal). 
+
+This paper presents the complete hardware/software co-design, quantization, deployment, and empirical evaluation of fixed-grid 2.5D VoxelMorph on AMD/Xilinx MPSoC FPGAs using Vitis AI 2.5. We evaluate registration accuracy, latency, memory footprint, and power consumption across held-out patient datasets, comparing FPGA DPU performance against ARM CPU and desktop CPU/GPU baselines.
+
+% =========================================================================
+\section{Background \& System Architecture}
+\label{sec:architecture}
+
+\subsection{Evolution from 2D Single-Slice to 2.5D Volumetric Fusion}
+Early efforts to adapt VoxelMorph for FPGA hardware relied on simple 2D U-Net models operating on isolated 2D slice pairs. While 2D models conform to DPU operator limits, single 2D slices lack spatial depth context along the out-of-plane dimension, leading to anatomical misalignment and registration accuracy loss.
+
+To preserve volumetric context while maintaining DPU operator compatibility, we adopt a 2.5D multi-view approach. Given a 3D moving volume $V_M$ and a 3D fixed volume $V_F$, sequential slice stacks are extracted along three orthogonal orientations: Axial ($z$-axis), Coronal ($y$-axis), and Sagittal ($x$-axis). For each slice position, a local window ($w_r = 1$) extracts 3 adjacent moving and 3 adjacent fixed slices. Stacking neighboring slices provides vital 3D spatial context to the 2D network while maintaining an operational memory footprint of only $\sim 110$~MB ($>15\times$ smaller than a 3D model).
+
+The overall 2.5D pipeline consists of five stages:
+\begin1. \textbf{Slice Extraction}: Multi-channel slice stacks are extracted from moving MR and fixed CT volumes.
+2. \textbf{DPU Neural Inference}: A shared 2D U-Net neural network processes each slice stack, outputting a 2D displacement field $(u_x, u_y)$.
+3. \textbf{3D Vector Field Lifting}: Predicted 2D displacement vectors are projected back into 3D space by inserting a zero displacement component along the slice axis.
+4. \textbf{Multi-View Fusion}: The 3D flow fields predicted across Axial, Coronal, and Sagittal views are averaged into a single coherent 3D displacement field $\phi_{3\text{D}}$:
+\begin{equation}
+    \phi_{3\text{D}} = \frac{1}{3} \left( \phi_{\text{Axial}} + \phi_{\text{Coronal}} + \phi_{\text{Sagittal}} \right)
+\end{equation}
+5. \textbf{3D Spatial Warping}: The fused 3D deformation field is applied to warp the moving intensity volume and its corresponding segmentation map.
+
+\subsection{Target Hardware Platform}
+The hardware target is an AMD/Xilinx ZCU104 MPSoC FPGA board, combining two primary execution domains:
+\begin{itemize}
+    \item \textbf{Processing System (PS)}: Quad-core ARM Cortex-A53 CPU running Linux and PYNQ, managing volume loading, slice stack extraction, 3D flow lifting, fusion, and volume warping.
+    \item \textbf{Programmable Logic (PL)}: Specialized DPU IP core (\texttt{DPUCZDX8G\_ISA1\_B4096}) operating as a high-throughput hardware systolic array for parallel 2D convolution execution.
+\end{itemize}
+
+% =========================================================================
+\section{Hardware/Software Co-Design \& Fixed-Grid Contract}
+\label{sec:codesign}
+
+\subsection{V4 Fixed-Grid Tensor Contract}
+Vitis AI DPU compilers enforce static tensor shape contracts. In early deployment attempts, dynamically resizing images or applying direct non-uniform stretching caused spatial aspect-ratio distortion, introducing vector misalignment when lifting 2D flow fields back into 3D.
+
+To solve this, we engineered the \textbf{V4 Fixed-Grid Geometry Contract}:
+\begin{itemize}
+    \item \textbf{Canonical Volume Grid}: All input patient volumes are resampled to a canonical spatial grid of $96 \times 112 \times 96$ voxels with $1$~mm isotropic spacing.
+    \item \textbf{DPU Hardware Interface}: The compiled neural network exposes a static input tensor shape of $[1, 112, 96, 16]$ in NHWC layout.
+    \item \textbf{16-Channel SIMD Alignment}: The 16 input channels consist of 8 moving slices followed by 8 fixed slices (padded from 7 to 8 to align perfectly with hardware vectorization boundaries).
+    \item \textbf{Orientation-Aware Letterboxing}: To fit the $112 \times 96$ DPU input plane without distorting physical anatomical proportions:
+    \begin{itemize}
+        \item \textit{Axial slices}: Fit natively at $112 \times 96$.
+        \item \textit{Coronal slices}: $96 \times 96$ native images receive centered 8-pixel top and bottom letterbox padding.
+        \item \textit{Sagittal slices}: $96 \times 112$ images are transposed to fit $112 \times 96$.
+    \end{itemize}
+    \item \textbf{Dual Resampling Rules}: Intensity images use trilinear interpolation for smooth gradient flow, while segmentation label maps use nearest-neighbor interpolation to preserve discrete anatomical region IDs.
+\end{itemize}
+
+\subsection{Task Partitioning (DPU vs ARM CPU)}
+Operations were partitioned based on arithmetic structure and memory access patterns:
+\begin{itemize}
+    \item \textbf{Mapped to FPGA DPU}: Dense, regular matrix operations including U-Net encoder-decoder convolutions, LeakyReLU activations, batch normalization, and 2D nearest-neighbor upsampling.
+    \item \textbf{Mapped to Host ARM CPU}: Irregular dynamic memory access operations including 3D coordinate grid construction, multi-view vector field lifting, mean fusion, and 3D trilinear intensity warping using SciPy \texttt{map\_coordinates}.
+\end{itemize}
+
+\subsection{Vitis AI INT8 Quantization Pipeline}
+Quantization converts floating-point weights (FP32) to 8-bit integers (INT8) to reduce memory bandwidth and leverage integer MAC units. Using Vitis AI 2.5 (\texttt{vai\_q\_pytorch}), 100 representative calibration slice stacks (33 axial, 33 coronal, 34 sagittal) were passed through the model to determine fixed-point scaling factors without requiring retraining.
+
+% =========================================================================
+\section{Experimental Setup \& Evaluation Protocol}
+\label{sec:methodology}
+
+\subsection{Dataset & Evaluation Cohort}
+The system was evaluated on held-out subject pairs from the TUCO brain dataset, arranged into nine deterministic cross-subject MR-to-CT registration pairs. Anatomical registration accuracy was evaluated across 16 anatomical brain structures (including caudate, putamen, hippocampus, thalamus, and ventricles).
+
+\subsection{Evaluation Metrics}
+Four quantitative metrics were calculated:
+\begin1. \textbf{Dice Similarity Coefficient (DSC)}: Measures anatomical label overlap ($0 = \text{no overlap}$, $1 = \text{perfect alignment}$).
+2. \textbf{Target Registration Error (TRE)}: Physical distance (in mm) between anatomical label centroids.
+3. \textbf{Mutual Information (MI)}: Measures multi-modal intensity dependence.
+4. \textbf{Structural Similarity (SSIM)}: Evaluates structural image similarity.
+
+\subsection{Isolated Measurement Scopes}
+To avoid mixing runtime metrics with evaluation overhead, three distinct measurement scopes were defined:
+\begin{enumerate}
+    \item \textbf{Quality Evaluation Scope}: Full clinical alignment pipeline including segmentation warping and metric computation.
+    \item \textbf{Inference-to-Warp Scope}: Pure operational latency from normalized input volume to warped intensity volume in memory.
+    \item \textbf{Inference-Only Power Scope}: Isolated execution pass measuring active voltage/current draw against a 20-second pre-execution idle baseline.
+\end{enumerate}
+
+% =========================================================================
+\section{Empirical Results \& Performance Analysis}
+\label{sec:results}
+
+\subsection{Registration Quality Comparison}
+Table~\ref{tab:quality_results} presents registration quality metrics across all nine validation pairs from the final benchmark run.
+
+\begin{table}[htbp]
+\caption{Registration Quality Comparison across 9 TUCO Volume Pairs}
+\label{tab:quality_results}
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l l c c c c}
+\toprule
+\textbf{Configuration} & \textbf{Method} & \textbf{Dice $\uparrow$} & \textbf{TRE (mm) $\downarrow$} & \textbf{MI $\uparrow$} & \textbf{SSIM $\uparrow$} \\
+\midrule
+Unregistered Baseline & None & 0.5712 & 3.724 & 0.5155 & 0.6980 \\
+\midrule
+FPGA DPU (INT8) & Axial Only & 0.7122 & 2.520 & 0.6043 & 0.7402 \\
+FPGA DPU (INT8) & \textbf{Mean Fused} & \textbf{0.7647} & \textbf{2.025} & 0.5957 & 0.7415 \\
+FPGA DPU (INT8) & Smoothed & 0.7599 & 2.036 & 0.5995 & 0.7398 \\
+\midrule
+FPGA ARM (FP32) & Axial Only & 0.7160 & 2.500 & 0.6063 & 0.7405 \\
+FPGA ARM (FP32) & \textbf{Mean Fused} & \textbf{0.7638} & \textbf{2.008} & 0.5942 & 0.7416 \\
+FPGA ARM (FP32) & Smoothed & 0.7592 & 2.014 & 0.5988 & 0.7401 \\
+\midrule
+Local Desktop GPU & 3D Model & 0.7609 & 2.111 & 0.5772 & 0.7459 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Figure~\ref{fig:dice_chart} illustrates the anatomical Dice similarity scores achieved by each method relative to the initial unregistered baseline.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{benchmark_charts/benchmark_chart_3.png}
+\caption{Dice Similarity Coefficient comparison before registration, after ARM CPU (FP32) inference, and after FPGA DPU (INT8) inference across Axial, Mean Fused, and Smoothed methods. INT8 quantization maintains quality parity with FP32 references.}
+\label{fig:dice_chart}
+\end{figure}
+
+\textbf{Key Quality Insights}:
+\begin{itemize}
+    \item \textbf{Quantization Parity}: The INT8 quantized DPU model achieves a Dice score of \textbf{0.7647} and TRE of \textbf{2.025~mm}, matching the FP32 ARM CPU baseline ($0.7638$ Dice, $2.008$~mm TRE). This confirms that Vitis AI INT8 quantization incurs zero loss in clinical registration accuracy.
+    \item \textbf{Value of Multi-View Fusion}: Multi-orientation Mean Fusion provides a significant quality boost over single-view Axial inference (+0.0525 Dice improvement and 0.495~mm TRE reduction).
+    \item \textbf{Parity with 3D Models}: The 2.5D mean-fused FPGA model achieves higher Dice overlap ($0.7647$) and lower TRE ($2.025$~mm) than the 3D local desktop reference ($0.7609$ Dice, $2.111$~mm TRE), while consuming a fraction of the memory footprint.
+\end{itemize}
+
+\subsection{Latency \& Execution Speedup}
+Table~\ref{tab:latency_results} breaks down execution latency into pure neural network model inference and host post-processing stages across Axial and Mean Fused methods.
+
+\begin{table}[htbp]
+\caption{Neural Network Model Inference vs Host Processing Breakdown}
+\label{tab:latency_results}
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l l c c c}
+\toprule
+\textbf{Device} & \textbf{Method} & \textbf{Model Infr. (ms)} & \textbf{Host Work (ms)} & \textbf{Total Time (s)} \\
+\midrule
+FPGA ARM (FP32) & Axial & 9,301.0 & 97,442.9 & 106.74 s \\
+\textbf{FPGA DPU (INT8)} & \textbf{Axial} & \textbf{575.1} & 97,319.3 & \textbf{97.89 s} \\
+\midrule
+FPGA ARM (FP32) & Mean Fused & 29,472.1 & 97,294.6 & 126.77 s \\
+\textbf{FPGA DPU (INT8)} & \textbf{Mean Fused} & \textbf{1,822.5} & 97,375.5 & \textbf{99.20 s} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Figure~\ref{fig:latency_chart} compares neural network model inference latency between the host ARM CPU and the hardware FPGA DPU.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{benchmark_charts/benchmark_chart_1.png}
+\caption{Neural network model inference latency comparison (ms) across 9 TUCO volume pairs for ARM CPU (FP32) vs. FPGA DPU (INT8). Hardware DPU acceleration delivers a 16.2$\times$ speedup over host ARM CPU execution.}
+\label{fig:latency_chart}
+\end{figure}
+
+\textbf{Key Latency Insights}:
+\begin{itemize}
+    \item \textbf{16.2$\times$ Model Speedup}: The DPU hardware engine executes the 3-view mean-fused neural network inference in just \textbf{1,822.5~ms} per volume (54 slice passes total), compared to \textbf{29,472.1~ms} on the ARM CPU core (\textbf{16.17$\times$ speedup}). Single-view Axial DPU inference runs in \textbf{575.1~ms} vs \textbf{9,301.0~ms} on ARM CPU.
+    \item \textbf{Overall Acceleration}: Combined end-to-end evaluation time is reduced from $126.77$~s to $99.20$~s for 3-view Mean Fusion.
+\end{itemize}
+
+\subsection{Power \& Energy Profiling}
+During full volumetric evaluation, DPU dynamic energy consumption was measured at \textbf{16.63~Joules} per volume (Mean Fused), compared to \textbf{27.05~Joules} for the ARM CPU, representing a \textbf{38.5\% dynamic energy reduction} (and up to $43.0\%$ in isolated profiling passes). The average active power draw on the FPGA board remained remarkably low at \textbf{1.83~Watts}. Figure~\ref{fig:energy_chart} details dynamic energy consumption across methods.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{benchmark_charts/benchmark_chart_2.png}
+\caption{Dynamic energy consumption (Joules per volume) during volumetric evaluation across ARM CPU and FPGA DPU execution domains. Dedicated DPU execution reduces dynamic energy consumption by 38.5\%.}
+\label{fig:energy_chart}
+\end{figure}
+
+Local desktop benchmarking showed that 2.5D GPU execution runs in $273.3$~ms ($15.57$~J dynamic energy), while local 3D GPU execution finishes in $114.7$~ms ($13.57$~J dynamic energy). While desktop GPUs offer raw speed, the 2.5D FPGA implementation provides a self-contained, low-power solution suitable for embedded clinical hardware.
+
+% =========================================================================
+\section{Engineering Lessons \& Bottleneck Analysis}
+\label{sec:lessons}
+
+Key lessons and insights from hardware deployment include:
+
+\begin{enumerate}
+    \item \textbf{Aspect Ratio Distortion}: Early deployment attempts stretched dynamic image planes, distorting brain anatomy. This was resolved by implementing the V4 letterboxing contract, preserving true physical anatomical proportions.
+    \item \textbf{Quantization Scale Mismatches}: Early DPU runs produced uniform zero flow fields due to positional scale indexing. This was resolved by dynamically mapping fixed-point scale factors by tensor name (\texttt{moving\_stack} vs \texttt{fixed\_stack}).
+    \item \textbf{Host-Side CPU Bottleneck}: While DPU neural inference takes under $1.82$~seconds for all three views combined ($0.58$~s per view), host-side 3D coordinate interpolation (`\texttt{map\_coordinates}`) requires $\sim 97.4$~seconds in the evaluation scope ($>95\%$ of total execution time). Offloading 3D volume warping to custom FPGA IP cores or optimized C++/NEON primitives represents the primary path for future performance gains.
+\end{enumerate}
+
+% =========================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+This work successfully designed, quantized, deployed, and evaluated a 2.5D VoxelMorph volumetric medical image registration pipeline on an AMD/Xilinx MPSoC FPGA using Vitis AI 2.5. By establishing a fixed-grid geometry contract ($112 \times 96 \times 16$) with letterbox padding, the FPGA implementation achieved high alignment accuracy ($0.7647$ Dice, $2.025$~mm TRE), matching floating-point software baselines. Hardware DPU acceleration delivered a $16.2\times$ neural inference speedup and a $38.5\%$ dynamic energy reduction during volumetric evaluation. Our open bottleneck analysis identifies host-side 3D volume warping as the primary target for next-generation hardware acceleration.
+
+% =========================================================================
+\begin{thebibliography}{00}
+\bibitem{balakrishnan2019voxelmorph} G. Balakrishnan, A. Zhao, M. R. Sabuncu, J. Guttag, and A. V. Dalca, ``VoxelMorph: A learning framework for deformable medical image registration,'' \emph{IEEE Transactions on Medical Imaging}, vol. 38, no. 8, pp. 1788--1799, 2019.
+\bibitem{vitisai} AMD/Xilinx, ``Vitis AI User Guide (UG1414),'' 2023. [Online]. Available: \url{https://www.xilinx.com/vitis-ai}
+\bibitem{pynq} Xilinx, ``PYNQ: Python Productivity for Zynq,'' [Online]. Available: \url{http://www.pynq.io/}
+\end{thebibliography}
+
+\end{document}

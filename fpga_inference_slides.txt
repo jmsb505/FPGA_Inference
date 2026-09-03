@@ -1,0 +1,230 @@
+=== PAGE 1 ===
+felipeesteban.puente@mail.polimi.it
+Felipe Puente
+Optimizing CNN Architectures for High-Performance
+Inference on FPGAs
+Multidiciplinary
+Project
+juanmartin.sanchez@mail.polimi.it
+Juan Martín Sánchez
+1
+=== PAGE 2 ===
+Project
+Objective
+2
+Implement volumetric image
+registration on FPGA using Vitis AI and
+evaluate with against CPU and GPU
+inference.
+ Develop an FPGA-compatible
+registration model
+ Complete Vitis AI deployment pipline
+on PYNQ-ZU
+Compare deployment with CPU and
+GPU execution on different qualities:
+Registration quality
+Model Latency
+End to end runtime
+Memory and deployment footprint
+Power and energy
+=== PAGE 3 ===
+What is VOlumetric
+Image registration? 
+Importance
+Aligns brain scans despite local tissue
+deformation
+Enables accurate multimodal image fusion
+Measures tissue displacement and structural
+change
+Supports longitudinal disease and treatment
+monitoring
+Improves diagnosis, surgical planning, and
+image-guided interventions
+3
+Process
+The moving image is an MR volume.
+The fixed image is a CT volume.
+The model predicts a deformation field.
+The deformation field is used to warp the moving
+MR into alignment with the CT.
+=== PAGE 4 ===
+Why FPGA deployment? 
+Pros
+Low-power execution
+Compact standalone hardware
+Configurable acceleration
+Potential use in constrained or embedded
+environments
+5
+Cons
+Static input tensors
+Restricted operator support
+Quantized execution
+Limited host CPU performance
+Explicit separation between accelerated and
+non-accelerated operations
+=== PAGE 5 ===
+Model selection
+5
+Deployment constraint
+The selected DPU architecture does not
+support the required 3D convolution ops 
+Transitioning to a 2.5D model allowed us to
+retain volumetric context and supported 2D
+convs
+Why even consider 2D models if the
+objective is volumetric image
+registration?
+=== PAGE 6 ===
+How our 2.5D
+model works:
+Step-1
+5
+=== PAGE 7 ===
+How our 2.5D
+model works:
+Step-2
+5
+=== PAGE 8 ===
+Models -Selection
+4
+=== PAGE 9 ===
+Stages
+Vitis AI
+deployment Flow 
+5
+=== PAGE 10 ===
+DPU Flow
+4
+=== PAGE 11 ===
+Evaluation
+configuration
+11
+Local Work station:
+AMD Ryzen 7900x 12-core Processor
+Nvidia Geforce RTX 4070ti
+On the FPGA board (PYNQ-ZU)
+Quantized network → FPGA DPU
+Floating point network → board CPU
+Additional baseline
+Local 3D model
+=== PAGE 12 ===
+Dataset for eval 11
+Evaluation
+18 held-out subjects
+Nine deterministic MR-to-CT evaluation pairs
+Dataset structure
+MR and CT volumes
+Corresponding segmentation maps
+Labels
+Sixteen anatomical segmentation labels used for
+overlap and centroid evaluation.
+=== PAGE 13 ===
+Evaluation
+Metrics
+11
+DICE
+Higher is better
+Measures overlap between warped-moving and fixed
+anatomical segmentations
+TRE
+Lower is better
+Segmentation-derived anatomical-label-centroid target
+registration error, reported in millimetres.
+Mutual Information
+Higher is better
+Measures multimodal MR-to-CT intensity alignment.
+SSSIM
+Higher is better
+Measures structural image similarity.
+=== PAGE 14 ===
+Evaluation
+Metrics
+11
+Analysis
+There is a consistent improvment
+across models
+2.5D models very slightly outpreform
+3D model
+DPU model retains accuracy after
+the vitis ai pipeline
+=== PAGE 15 ===
+Evaluation of
+resources:
+memory
+11
+Analysis
+2.5D model is more memory
+efficient than 3D model
+Quantized model deployed on DPU
+is the clear winner on memory
+efficiency 
+=== PAGE 16 ===
+Evaluation of
+resources:
+Latency
+11
+Analysis
+Locally deploy models are much
+more latency efficient than the
+FPGA
+ARM CPU on fpga is responsable for
+the majority portion of the latency
+=== PAGE 17 ===
+Evaluation of
+resources: Energy
+and Power
+11
+Analysis
+Both FPGA deployed models are the
+most efficient on both energy and
+power 
+DPU deployment leads efficiency
+=== PAGE 18 ===
+Did we achive the
+objective?
+17
+FPGA implementation
+Volumetric MR-to-CT registration was successfully
+deployed on the FPGA.
+The DPU executes the quantized 2.5D network.
+The ARM CPU completes flow reconstruction and
+volumetric warping.
+Axial, coronal and sagittal predictions are fused into a
+3D deformation field.
+Main Results
+The FPGA produces competitive registration quality.
+The DPU is faster than ARM-only board execution.
+The local GPU remains the fastest platform.
+The main FPGA limitation is ARM-side processing, not
+DPU inference.
+=== PAGE 19 ===
+Main technical
+findigs
+17
+=== PAGE 20 ===
+Limited Dataset
+No 3D model representation on FPGA
+Limitations 
+Next steps and future work
+Optimize the FPGA code implementation* currently
+underway will be done before end of project
+Evaluate boards with stronger CPU resources.
+Explore accelerators supporting 3D operations.
+Investigate a full 3D FPGA implementation only on suitable
+hardware.
+FInal conclusions,
+Limitations and Next Steps 
+17
+Final Conclusion
+Volumetric image registration was successfully implemented
+on FPGA using Vitis AI.
+The 2.5D architecture provided an FPGA-compatible solution
+to the original volumetric task.
+The FPGA deployment maintains competitive registration
+quality with a compact INT8 model.
+DPU acceleration reduces board runtime compared with
+ARM-only execution.
+The local GPU remains significantly faster.
+ARM-side flow reconstruction and volumetric warping are
+now the main performance bottlenecks.

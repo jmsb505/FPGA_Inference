@@ -1,0 +1,32 @@
+{
+  "archive_layout": "flat; extract beside the current board notebook",
+  "dataset_included": false,
+  "target": "FPGA board ARM CPU",
+  "precision": "FP32",
+  "files": {
+    "2p5d_dense_pt_v4_canonical_best.pth": {
+      "bytes": 586004,
+      "sha256": "b595d67f3c9d2d050ac74e4342de836856ed67b8deb6941b7853d75baecc7fc0"
+    },
+    "README_FP32_BOARD.txt": {
+      "bytes": 547,
+      "sha256": "37d174945c377bb041c21a8e4b0d04737ab61bbbbdf3f047731f9486a39f8ebc"
+    },
+    "fpga_deployment_power.py": {
+      "bytes": 16916,
+      "sha256": "503b70986fca98edefea1ebf8de2cf50766d8f680bacf9ac65cb85679a09346c"
+    },
+    "fpga_deployment_timing.py": {
+      "bytes": 11181,
+      "sha256": "a6de327d422195b8b2af45242ab95d6a1626ca42d679a2b9d705dac1bd303c86"
+    },
+    "fpga_inference_fp32.ipynb": {
+      "bytes": 29614,
+      "sha256": "262d3cb469e6d49e8ab4b74d796465d65789ecf1706156feae72d88209efea6e"
+    },
+    "vxm_2p5d_export.py": {
+      "bytes": 10471,
+      "sha256": "cba81849ec5b30a3bb70de87de1c7be5114fa4652a43cf7884b9b3a000fb70ce"
+    }
+  }
+}

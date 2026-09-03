@@ -1,0 +1,274 @@
+=== PAGE 1 ===
+Optimizing VoxelMorph CNN
+Inference on FPGA DPUs
+Juan Mart´ ın Sanchez, Felipe Puente
+June 30, 2025
+
+=== PAGE 2 ===
+Abstract
+Real-time inference of convolutional neural networks (CNNs) is
+critical in the field of medical imaging applications. In this report
+we present an optimized implementation of VoxelMorph, a 2D U-
+Net–based image registration model, targeting Xilinx FPGA DPUs
+on the KV260 platform. Using the Vitis AI development flow, we
+perform INT8 quantization on the model and compile the network
+into subgraphs mapped to the DPU and CPU, then benchmark infer-
+ence latency and registration accuracy against CPU and GPU base-
+lines. Experiment results show that the FPGA DPU achieves an
+average inference latency of 50.9 ms—with a standard deviation of
+0.6 ms—approaching the CPU’s 56.5 ms and the GPU’s 48.1 ms, while
+decreasing accuracy (mean squared error increase from 6.03 ×10-³ to
+2.89×10-²). These findings show that FPGAs might be a viable plat-
+form for medical image registration, balancing throughput and preci-
+sion.
+1 Introduction
+Convolutional neural networks (CNNs) have revolutionized medical image
+analysis, helping in tasks such as segmentation and image registration. How-
+ever, many of these models demand substantial computational resource when
+inference is conducted on traditional CPUs or GPUs. Field-programmable
+gate arrays (FPGAs) offer a promising solution, combining customizable
+hardware acceleration with low-power operation.
+VoxelMorph, a 2D U-Net–based framework for image registration, achieves
+high registration accuracy by learning a dense displacement field between
+fixed and moving MRI scan slices. Despite its accuracy, VoxelMorph is still
+computational complex and could be a challenges for real-time inference
+on standard consumer devices. To address this, we explore an end-to-end
+hardware acceleration strategy using Xilinx’s Vitis AI toolchain, which au-
+tomates quantization, compilation, and deployment of deep learning models
+onto FPGA DPUs.
+In this report, we detail our workflow for adapting VoxelMorph to the
+KV260 FPGA board. We describe our dataset preparation, model quantiza-
+tion from 32-bit floating-point to 8-bit integer precision, and subgraph par-
+titioning optimized for the DPU architecture. We then evaluate the model’s
+inference latency and registration accuracy on DPU, comparing it against
+CPU and GPU. Our evaluation metrics include mean squared error (MSE),
+image gradient consistency, and inference latency.
+1
+=== PAGE 3 ===
+The main contributions of this study are: (1) a comprehensive assess-
+ment of VoxelMorph performance across different computing platforms, (2) a
+demonstration of Vitis AI’s quantization and compilation efficiency for image
+registration networks, and (3) practical insights into FPGA DPU’s tradeoffs
+between latency and accuracy. The rest of the report is organized as fol-
+lows: Section 2 reviews related work on FPGA-based CNN acceleration and
+the VoxelMorph model, Section 3 outlines our materials and methods, Sec-
+tion 4 describes the experimental setup, Section 5 presents results, Section 6
+discusses the implications, and Section 7 concludes with future directions.
+2 Background and Related Work
+2.1 CNN Inference on FPGAs
+FPGAs have been recognized as a flexible platform for accelerating CNN
+inference, offering a balance between performance, power efficiency, and re-
+configurability. Xilinx’s Deep Learning Processing Unit (DPU) is a core
+optimized for convolutional operations and commonly deployed via the Vi-
+tis AI toolchain [5]. The DPU architecture supports 8-bit integer (INT8)
+operations, enabling high throughput. Compared to GPU and CPU imple-
+mentations, FPGAs can achieve competitive latency with significantly lower
+power consumption, but at the cost of slightly more complex design flows and
+potential resource constraints [3]. Vitis AI streamlines this process by pro-
+viding tools for quantization, compilation, and runtime libraries for mapping
+CNN graphs into DPU-executable subgraphs [6].
+2.2 VoxelMorph Model
+VoxelMorph is a unsupervised learning based image registration framework
+originally designed with a 3D U-Net architecture and a spatial transformer to
+predict deformation fields between volumetric scans [1]. For FPGA deploy-
+ment, since Vitis AI does not support 3D convolutions, we implemented a 2D
+U-Net version of the same model, processing 192 x 224 MRI slices instead of
+3D volumes. The encoder–decoder structure with skip connections includes
+four downsampling and upsampling stages, using convolution, MaxPooling,
+and Leaky ReLU activations. The output is a 2D displacement flow that is
+later applied to the moving image input to generate the warped image, this
+is done by the Spatial Transformer.
+2
+=== PAGE 4 ===
+2.3 Quantization and Compilation Tools
+To deploy the 2D VoxelMorph model on FPGA DPUs, we utilize Xilinx’s
+Vitis AI development flow. Post-training quantization is performed with the
+TensorFlow quantizer, calibrating on a subset of 20 validation pair slices (one
+moving image and one fixed image) to evaluate the quantized model. The key
+class used was VitisQuantizer from tensorflow model optimization li-
+brary and for quantization and the command vai c tensorflow was key to
+generate the compilation to teh approapiate DPU. The compiler partitions
+the network into subgraphs based on DPU-supported operations to generate
+the target board (KV260) binaries [4].
+3 Materials and Methods
+3.1 Dataset Preparation
+We use the IXI T1-weighted brain MRI dataset [2], selecting 481 volumes
+from the full collection. From each volume, we extract 2D slices of size
+192×224 pixels, forming a total of 2,000 fixed-moving slice pairs. Of these,
+1,800 pairs where used for training, while 200 where used for validation. 20
+of the 2000 pairs where used for the calibrations set.
+3.2 Model Architecture
+We built a 2D U-Net based of the original VoxelMorph model by concatenat-
+ing two single channel 192 × 224 inputs (moving and fixed) into a 2-channel
+tensor, which is fed through an encoder of four down-sampling stages (with
+filter counts [16, 32, 32, 32], each stage consisting of two 3 × 3 convolutions
+followed by Leaky ReLU activations and 2 × 2 max-pooling), a bottleneck
+that mirrors the deepest encoder block without pooling, and a decoder of four
+up-sampling stages (with filter counts [32, 32, 32, 16], each stage performing
+nearest-neighbor ×2 up-sampling, concatenation with the corresponding en-
+coder features, and two 3 × 3 convolutions plus Leaky ReLU). A final 3 ×
+3 convolution produces a two-channel displacement field , which is applied
+with a spatial transformer to warp the moving image into alignment with the
+fixed image.
+3.3 FPGA Platforms
+We target three Xilinx FPGA boards:
+3
+=== PAGE 5 ===
+• VCK5000: DPUCAHX8H.
+• ZCU104: DPUCZDX8G.
+• KV260: DPUCZDX8G.
+Although we performed quantization and compilation for all three boards
+(VCK5000, ZCU104, KV260), due to incompatibility issues with Vitis AI
+and limited credentials, inference experiments were conducted only on the
+KV260 platform.
+3.4 Implementation Challenges
+Some challenges came up during development:
+• Layer Support : The DPU lacked native support for Spatial Trans-
+form layer. So the layer was offloaded to the CPU as a post-processing
+step.
+• Toolchain and Access Issues : Incompatibilities in Vitis AI pre-
+vented deployment on ZCU104, also lack of access to a VCK5000 pre-
+vented deployment. Due to these issues, all experimental runs were
+limited to KV260.
+• Activation Support : The Standard VoxelMorph model had Leaky
+ReLu slopes set to 2.0 while the DPU only supports a 0.1015625 slope.
+4 Experimental Setup
+4.1 Hardware and Software Environment
+The experimental benchmarks were conducted on three computing platforms:
+a CPU, a GPU, and the Xilinx KV260 FPGA.
+The CPU tests were performed on an AMD Ryzen 9 7900X (12 cores,
+24 threads, 4.6 GHz boost) with 32 GB DDR5 RAM. GPU measurements
+used an NVIDIA GeForce RTX 4070 Ti (12 GB GDDR6X) hosted on the
+same machine. FPGA experiments executed the VoxelMorph inference on
+the KV260’s ZU5EV MPSoC with the DPUCZDX8G DPU.
+4
+=== PAGE 6 ===
+4.2 Software Stack
+All models were trained and profiled in TensorFlow 2.10 with Python 3.9.
+The Vitis AI 3.5 toolchain (VitisQuantizer from tensorflow model optimiza-
+tion, vai c tensorflow, and VART runtime) was used for quantization, com-
+pilation, and FPGA deployment. Benchmarking scripts utilized the VART
+python API, Pynq, and Pynq-DPU on the KV260 and Tensorflow and other
+utilities for CPU/GPU runs. OS environments included Ubuntu 22.04 LTS
+for the host and PetaLinux 2022.2 for the KV260.
+4.3 Evaluation Metrics
+We assess performance via two metrics:
+• Latency: Average per-pair inference time (mean and standard devia-
+tion) over the calibration set. CPU and GPU times measure only the
+inference process, while FPGA latency measures DPU inference time.
+Since there are unsupported layers on DPU, latency of inference was
+only measured up until the last layer supported in DPU to have a fair
+understanding on inference latency.
+• Accuracy: Registration quality quantified by mean squared error
+(MSE) between registered and ground-truth slices, and image gradi-
+ent consistency metrics, computed in NumPy.
+4.4 Measurement Procedures
+For each platform, we ran five independent trials of the full calibration set (20
+pair slices) to account for variability. From timing data mean and standard
+deviation was computed then logged to .npy files.
+5 Results
+5.1 Accuracy Metrics
+Table 1 reports the registration quality for each platform. Both the CPU
+and GPU baselines achieve identical performance (MSE = 6 .03 × 10−3, gra-
+dient consistency = 0.438), while the FPGA DPU on the KV260 has a MSE
+increase (to 2 .89 × 10−2), but still has similar gradient consistency of 0.527.
+5
+=== PAGE 7 ===
+Table 1: Registration Accuracy Metrics
+Device MSE Gradient Consistency
+CPU 6 .03 × 10−3 0.438
+GPU 6 .03 × 10−3 0.438
+DPU (KV260) 2 .89 × 10−2 0.527
+5.2 Latency Measurements
+Table 2 summarizes the pair inference times over the calibration pairs set.
+The FPGA DPU has a mean latency of 50.94 ms (SD = 0.59 ms), combining
+low latency with good consistency. The CPU, is slower on average (56.49
+ms) and shows higher variability (SD = 36.61 ms), and the GPU is fastest
+on average (48.10 ms) but with large variability (SD = 56.76 ms).
+Table 2: Inference Latency per Slice
+Device Mean Latency (ms) Std Dev (ms)
+CPU 56.49 36.61
+GPU 48.10 56.76
+DPU (KV260) 50.94 0.59
+5.3 Qualitative Results
+Figure 1 shows the outputs of inference on the first pair on the calibrations
+set
+6
+=== PAGE 8 ===
+(a) KV260 DPU: (a) Moving, (b) Fixed, (c) Warped + Flow
+(b) CPU: (a) Moving, (b) Fixed, (c) Warped + Flow
+(c) GPU: (a) Moving, (b) Fixed, (c) Warped + Flow
+Figure 1: Registration outputs on KV260 DPU, CPU, and GPU for a sample
+pair.
+Visually, CPU and GPU platforms produce nearly identical results. While
+DPU inference results have a lower accuracy that show a clear distinction of
+results against the other platforms.
+6 Discussion
+The results demonstrate that FPGA-based inference of a quantized 2D Vox-
+elMorph model on the KV260 DPU can closely approach GPU performance
+in terms of latency, while substantially improving consistency even with third
+7
+=== PAGE 9 ===
+of the price of the board compared to the CPU and GPU used. Although
+the DPU’s mean latency (50.94 ms) lags slightly behind the GPU (48.10 ms),
+its low variability (0.59 ms vs. 56.76 ms) is highly advantageous for real-time
+systems that require predictable inference times for a fraction of the cost per
+device.
+The increase in registration error (MSE rising from 6 .03 × 10−3 to 2.89 ×
+10−2) still needs to be analyzed in order to determine the cause. As observed
+in Figure 1, there is a distinct difference of output performance. The cause
+was not determined due to time restrictions of the project, but possible causes
+might be: Quantization or the manual processing of the Flow and Spatial
+Transform layers after the DPU subgraph processing.
+Compared to prior FPGA implementations of U-Net variants [2,], our
+work extends hardware acceleration to image registration networks, demon-
+strating that both latency and registration quality remain competitive. The
+seamless integration of Vitis AI for quantization and compilation simpli-
+fied development, though we encountered tool-chain incompatibilities on the
+ZCU104 board due to versioning issues, this highlights the importance of
+all the elements of the flow being the appropriate version, going from the
+Tensorflow layers to the board’s image.
+Limitations of this study include the focus on single-slice 2D inference,
+extending to full 3D volumes would better capture volumetric context but
+the current Vitis AI does not support 3D Convolutional layers. Additionally,
+we did not measure the power efficiency of the devices, which is one of the
+strong suits of the FPGA’s architecture.
+Overall, our findings show that FPGAs—when combined with automated
+toolchains like Vitis AI—provide a compelling platform for efficient, deter-
+ministic CNN inference in medical imaging tasks. More studies need to be
+conducted to determine the loss of accuracy when utilizing this specific tools.
+7 Conclusions and Future Work
+In this work, we have presented an end-to-end evaluation of a 2D Voxel-
+Morph image registration model on Xilinx FPGA DPUs, using the KV260
+board. Using the Vitis AI tool-chain, we showed that INT8-quantized in-
+ference achieves latency (50.94 ms) comparable to GPU baselines. While
+the flow introduces accuracy reduction (MSE increase to 2 .89 × 10−2), the
+resulting registration’s cause still needs to be determined in order improve
+it.
+Future work should focuse on 2 main scenarios:
+• Multi-Board Evaluation: Multiple FPGAs need to be evaluated in
+8
+=== PAGE 10 ===
+order to give a wider understanding on how Vitis AI interacts with
+different board architectures.
+• Inference loss increase evalaution: The complete flow needs to be
+evaluated in order to determine the cause of increase in MSE error
+when running inference on DPU.
+These extensions will provide valuable information in order to determine
+how fit are FPGAs in the current AI landscape.
+References
+[1] G. Balakrishnan et al. “VoxelMorph: A learning framework for deformable
+medical image registration”. In: IEEE Transactions on Medical Imaging
+38.8 (2019), pp. 1788–1800.
+[2] Biomedical Image Analysis Group, Imperial College London. IXI Dataset:
+T1-Weighted Brain MR Images of Healthy Subjects . https://brain-
+development.org/ixi-dataset/ . Accessed: 2025-06-30; collected un-
+der EPSRC grant GR/S21533/02. 2008.
+[3] E. Nurvitadhi et al. “Can FPGAs beat GPUs in accelerating next-
+generation deep neural networks?” In: Proc. 2017 ACM/SIGDA Int.
+Symp. Field-Programmable Gate Arrays . 2017.
+[4] Vitis AI Quantization and Compilation Flow . White Paper. Xilinx, 2022.
+[5] Vitis AI: AI Inference Acceleration for Zynq Devices . White Paper. Xil-
+inx, 2021.
+[6] Xilinx. Vitis AI User Guide (UG1414) . Xilinx. 2022.
+9

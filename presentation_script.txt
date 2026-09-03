@@ -1,0 +1,211 @@
+===============================================================================
+            VOLUMETRIC IMAGE REGISTRATION ON FPGA - PRESENTATION SCRIPT
+===============================================================================
+Speaker: Felipe Puente C. & Juan Martín Sánchez
+Target Presentation: fpga_inference_final_presentation.pdf
+Assigned Slides: Slides 1-13 & Slides 37-50
+Total Team Allocation: 15 Minutes | Speaker Allocation: ~7.0 Minutes
+===============================================================================
+
+-------------------------------------------------------------------------------
+PART I: INTRODUCTION, PROBLEM & HARDWARE FOUNDATIONS (Slides 1-13)
+Target Duration: ~3.0 Minutes
+-------------------------------------------------------------------------------
+
+[SLIDE 1] Title & Welcome
+Title: Volumetric Image Registration on FPGA
+Time: 0:00 - 0:15 (15 seconds)
+
+SPOKEN SCRIPT:
+"Good morning everyone. Today, Juan Martín and I will present our project on 
+accelerating 3D Volumetric Medical Image Registration on an Edge FPGA platform. 
+In clinical image-guided interventions, aligning intraoperative 3D scans in real 
+time is critical. Today we will show how we adapted a deep neural network model 
+to run efficiently on FPGA hardware."
+
+
+[SLIDES 2-5] Project Roadmap & Agenda
+Title: Project Roadmap (Registration Problem -> FPGA Deployment -> Evaluation)
+Time: 0:15 - 0:40 (25 seconds)
+
+SPOKEN SCRIPT:
+"To guide you through our work, our presentation is structured into three main blocks:
+1. First, understanding the 3D Volumetric Registration Problem and the clinical challenge.
+2. Second, our Hardware Deployment using Vitis AI and the AMD DPU.
+3. And third, our empirical Evaluation across registration accuracy, execution 
+   latency, and power consumption.
+
+Let’s start with the fundamental registration problem."
+
+
+[SLIDES 6-9] What is Volumetric Image Registration?
+Title: Volumetric Image Registration Workflow
+Time: 0:40 - 1:20 (40 seconds)
+
+SPOKEN SCRIPT:
+"In medical imaging, patient scans are taken using different modalities—such 
+as MRI for soft tissue detail and CT for dense bone structures. Volumetric 
+registration is the process of spatially aligning these two 3D scans so a surgeon 
+or algorithm can view them in a single unified coordinate space.
+
+Instead of relying on slow traditional optimization algorithms that take 
+minutes per volume, we use a deep neural network. The network takes the 
+moving MRI and fixed CT volumes, predicts a dense 3D deformation flow field, 
+and warps the moving image into alignment in a single forward pass."
+
+
+[SLIDE 10] Dataset Used (SynthRAD 2023 / SR-Reg)
+Title: Dataset Used: SR-Reg Brain MR–CT
+Time: 1:20 - 1:40 (20 seconds)
+
+SPOKEN SCRIPT:
+"For training and validation, we used the public SynthRAD 2023 dataset, 
+consisting of 180 patient subjects with aligned 3D MRI, CT scans, and 16 
+expert-annotated anatomical brain segmentations."
+
+
+[SLIDE 11] Baseline Model Architecture (VoxelMorph 3D)
+Title: Model Used: VoxelMorph 3D
+Time: 1:40 - 2:05 (25 seconds)
+
+SPOKEN SCRIPT:
+"Our baseline algorithmic model is VoxelMorph—a popular U-Net-based 
+self-supervised architecture. While 3D VoxelMorph achieves high accuracy on 
+desktop GPUs, running full 3D convolutions on edge hardware creates severe 
+memory bottlenecks, exceeding 1.7 gigabytes of intermediate RAM allocation."
+
+
+[SLIDE 12] Target Hardware Platform (Zynq UltraScale+ MPSoC)
+Title: Target Platform: Why an FPGA-based SoC?
+Time: 2:05 - 2:35 (30 seconds)
+
+SPOKEN SCRIPT:
+"To deploy this in point-of-care medical environments under strict thermal 
+power limits (under 15 Watts), we chose the AMD Zynq UltraScale+ MPSoC.
+
+This system combines a quad-core ARM CPU—which handles data management and 
+pre/post-processing—with FPGA programmable logic hosting a specialized Deep 
+Learning Processing Unit (DPU) core for hardware-accelerated tensor matrix operations."
+
+
+[SLIDE 13] Vitis AI & Toolchain Role
+Title: Why Vitis AI Matters Here
+Time: 2:35 - 3:00 (25 seconds)
+
+SPOKEN SCRIPT:
+"To bridge the gap between PyTorch and FPGA hardware, we used AMD Vitis AI. 
+It handles the entire compilation flow: converting 32-bit floating-point 
+weights into 8-bit integer quantized models, generating the binary .xmodel 
+runtime, and enforcing a clear operational split between the CPU and the DPU.
+
+I will now hand over to my teammate, who will detail our hardware model 
+adaptation, quantization strategy, and DPU compilation pipeline."
+
+-------------------------------------------------------------------------------
+[HAND-OFF TO TEAMMATE FOR SLIDES 14-36]
+-------------------------------------------------------------------------------
+
+
+-------------------------------------------------------------------------------
+PART II: DPU EXECUTION, EXPERIMENTAL SETUP & RESULTS (Slides 36-50)
+Target Duration: ~4.5 Minutes
+-------------------------------------------------------------------------------
+
+[SLIDE 36] Vitis AI Deployment Flow
+Title: Vitis AI Deployment Flow
+Time: 2:50 - 3:25 (35 seconds)
+
+SPOKEN SCRIPT:
+"Before executing on the board, our trained 2.5D VoxelMorph model passes through 
+the Vitis AI Deployment Flow, which consists of three key steps:
+
+First, INT8 Quantization using vai_q_pytorch. We pass 100 representative 
+calibration slice stacks through the model to convert 32-bit floating-point 
+weights into 8-bit integers without requiring any retraining.
+
+Second, Vitis AI Compilation using vai_c_pytorch. The compiler parses the 
+quantized graph targeting our specific DPU architecture—the DPUCZDX8G B4096 core. 
+It automatically maps all supported U-Net convolution layers onto the hardware DPU 
+and generates the compiled binary .xmodel file.
+
+Finally, Board Runtime Deployment. On the FPGA board, the Vitis AI Runtime (VART) 
+loads the .xmodel file, allowing Python and PYNQ to feed slice stacks directly 
+into the hardware DPU buffers.
+
+Now, let’s look at how this compiled model actually executes in real time 
+across the three orthogonal views..."
+
+
+[SLIDES 37-43] DPU 2.5D Multi-View Fusion Execution
+Title: DPU Execution: Three 2D Flows -> 3D Fusion
+Time: 3:00 - 4:00 (60 seconds)
+
+SPOKEN SCRIPT:
+"Welcome back. Now let’s look at how our deployed model actually executes on the board.
+
+Because the DPU hardware array is optimized for 2D convolutions, we reformulated 
+3D registration into a 2.5D multi-view approach.
+
+Instead of feeding a heavy 3D volume all at once, the ARM host extracts 2.5D slice 
+stacks across three orthogonal planes: Axial, Coronal, and Sagittal.
+
+The FPGA DPU hardware engine rapidly computes the 2D displacement field for 
+each slice stack. The host CPU then projects these 2D vectors back into 3D 
+space and computes a 3-view mean fusion flow field. This fusion recovers full 
+3D spatial depth while keeping operational memory under 110 megabytes."
+
+
+[SLIDE 44] Experimental Setup & Telemetry KPIs
+Title: Experimental Setup
+Time: 4:00 - 4:40 (40 seconds)
+
+SPOKEN SCRIPT:
+"To rigorously measure performance, we established three isolated KPI 
+measurement rules on the physical board:
+1. Latency: Measured strictly from normalized input volume in memory to final 
+   warped volume output.
+2. Active Power & Dynamic Energy: Logged using onboard power rails sampled 
+   against a 20-second pre-execution idle baseline.
+3. Quality: Evaluated using full clinical segmentation warping across standard metrics."
+
+
+[SLIDE 45] Evaluation Cohort & Anatomical Labels
+Title: Evaluation Dataset
+Time: 4:40 - 5:05 (25 seconds)
+
+SPOKEN SCRIPT:
+"Our quantitative benchmarks were performed across 9 held-out patient volume 
+pairs from the SynthRAD dataset, evaluating registration accuracy across 16 
+anatomical brain structures—including the hippocampus, thalamus, caudate, and ventricles."
+
+
+[SLIDES 46-50] Registration Quality & Parity Results
+Title: Registration Quality After Deployment
+Time: 5:05 - 6:20 (75 seconds)
+
+SPOKEN SCRIPT:
+"Here are the final registration quality results:
+
+Starting from an unregistered baseline Dice score of 0.571, our 2.5D mean-fused 
+INT8 model deployed on the FPGA DPU reaches a Dice score of 0.7647 and reduces 
+Target Registration Error down to 2.02 millimeters.
+
+Crucially, comparing our INT8 FPGA model against the 32-bit floating-point 
+software reference running on CPU (0.7638 Dice), we observe zero loss in 
+clinical registration accuracy. Furthermore, our 2.5D multi-view FPGA model 
+actually matches full 3D desktop GPU models (0.7609 Dice) while consuming 
+over 15 times less peak memory.
+
+In summary, Vitis AI 8-bit quantization preserves clinical alignment quality 
+perfectly on edge FPGA hardware."
+
+
+===============================================================================
+KEY SUMMARY CHECKLIST FOR DELIVERY:
+- Pacing: ~7 minutes total speaker time.
+- Key Numbers to Highlight:
+    * Dice Score: 0.7647 (INT8 DPU) vs 0.7638 (FP32 CPU) -> Full Parity!
+    * TRE: 2.025 mm (Target Registration Error)
+    * Power: 1.83 Watts average active board power draw
+    * Memory: 110 MB operational RAM (>15x reduction vs 3D)
+===============================================================================
