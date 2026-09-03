@@ -83,9 +83,8 @@ Voxelmorph/artifacts/results/presentation_inputs/*
 !Voxelmorph/artifacts/results/presentation_inputs/presentation_resource_metrics_v4.json
 
 !Voxelmorph/artifacts/results/int8_arm_cpu_v4_results/
-Voxelmorph/artifacts/results/int8_arm_cpu_v4_results/*
-!Voxelmorph/artifacts/results/int8_arm_cpu_v4_results/benchmark_summary_int8_arm_cpu.md
-!Voxelmorph/artifacts/results/int8_arm_cpu_v4_results/int8_arm_cpu_results_v4.json
+!Voxelmorph/artifacts/results/int8_arm_cpu_v4_results/**
+
 
 
 # Python, notebooks, editors, and local agent state

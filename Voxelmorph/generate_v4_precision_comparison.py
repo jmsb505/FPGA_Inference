@@ -27,7 +27,9 @@ GPU_INT8_PATH = (
     / "inference_only_local_power_latency"
     / "v4_gpu_int8_tensorrt.json"
 )
-ARM_INT8_PATH = RESULTS_ROOT / "int8_arm_board_results_v4.json"
+ARM_INT8_PATH = (
+    RESULTS_ROOT / "int8_arm_cpu_v4_results" / "int8_arm_cpu_results_v4.json"
+)
 ARM_INT8_BUNDLE_PATH = (
     REPO_ROOT / "fpga_inference_int8_board_bundle" / "int8_arm_board_results_v4.json"
 )
