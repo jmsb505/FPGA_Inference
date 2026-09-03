@@ -225,10 +225,10 @@ def plot_panel(axis, records, field, title, ylabel, log_scale=False):
     if log_scale:
         axis.set_yscale("log")
         ymin, ymax = axis.get_ylim()
-        axis.set_ylim(ymin, ymax * 6.0)
+        axis.set_ylim(ymin, ymax * 2.2)
     else:
         ymin, ymax = axis.get_ylim()
-        axis.set_ylim(ymin, ymax * 1.3)
+        axis.set_ylim(ymin, ymax * 1.15)
     label_bars(axis, containers, ".3g")
     if field in {"latency_s", "raw_mean_power_w"}:
         arm_int8_rec = [r for r in records if r["platform"] == "ARM CPU" and r["precision"] == "INT8"]
