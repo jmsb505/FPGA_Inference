@@ -1,6 +1,6 @@
 """
 Generate deployment breakdown graphics for VoxelMorph 2.5D across FP32 and INT8 precisions.
-Uses the exact visual style, colors, despined axes, bar labels, and typography from generate_v4_precision_comparison.py.
+Uses the exact record construction and styling from generate_v4_precision_comparison.py.
 """
 from __future__ import annotations
 
@@ -15,68 +15,70 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 RESULTS_ROOT = SCRIPT_DIR.parent
 OUTPUT_DIR = SCRIPT_DIR
 
-# Source result files
-LOCAL_FP32_PATH = RESULTS_ROOT / "inference_only_local_power_latency" / "local_2p5d_3d_cpu_gpu_9_pairs.json"
-LOCAL_CPU_INT8_PATH = RESULTS_ROOT / "inference_only_local_power_latency" / "v4_fp32_int8_host_comparison.json"
-LOCAL_GPU_INT8_PATH = RESULTS_ROOT / "inference_only_local_power_latency" / "v4_gpu_int8_tensorrt.json"
-BOARD_FP32_DPU_PATH = RESULTS_ROOT / "inference_pipeline_breakdown" / "fpga_board_9_pairs.json"
-BOARD_ARM_INT8_PATH = RESULTS_ROOT / "int8_arm_cpu_v4_results" / "int8_arm_cpu_results_v4.json"
+BOARD_PATH = RESULTS_ROOT / "inference_pipeline_breakdown" / "inference_pipeline_power_latency_v4.json"
+HOST_PATH = RESULTS_ROOT / "inference_only_local_power_latency" / "v4_fp32_int8_host_comparison.json"
+GPU_INT8_PATH = RESULTS_ROOT / "inference_only_local_power_latency" / "v4_gpu_int8_tensorrt.json"
+ARM_INT8_PATH = RESULTS_ROOT / "int8_arm_cpu_v4_results" / "int8_arm_cpu_results_v4.json"
 
 PLATFORMS = ["FPGA DPU", "ARM CPU", "Local CPU", "Local GPU"]
 PRECISIONS = ["FP32", "INT8"]
 COLORS = {"FP32": "#3977B8", "INT8": "#E57A2D"}
 
+
+def read_json(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def make_record(platform: str, precision: str, model: dict, latency_key: str, backend: str, power_scope: str) -> dict:
+    latency_ms = float(model[latency_key])
+    power_w = float(model["power_mean_w_mean"])
+    throughput = 1000.0 / latency_ms
+
+    # Model execution vs data movement
+    model_ms = float(model.get("model_inference_ms_mean", 0.0))
+    if model_ms == 0.0 and "cpu_model_ms_mean" in model:
+        model_ms = float(model["cpu_model_ms_mean"])
+    data_ms = max(0.0, latency_ms - model_ms)
+
+    return {
+        "platform": platform,
+        "precision": precision,
+        "status": "measured",
+        "latency_ms_mean": latency_ms,
+        "latency_ms_sd": float(model.get(latency_key.replace("_mean", "_sd"), 0.0)),
+        "total_s": latency_ms / 1000.0,
+        "total_s_sd": float(model.get(latency_key.replace("_mean", "_sd"), 0.0)) / 1000.0,
+        "model_s": model_ms / 1000.0,
+        "model_s_sd": float(model.get("model_inference_ms_sd", 0.0)) / 1000.0,
+        "data_s": data_ms / 1000.0,
+        "raw_mean_power_w": power_w,
+        "raw_mean_power_sd_w": float(model.get("power_mean_w_sd", 0.0)),
+        "raw_energy_j_per_inference": float(model["energy_j_per_inference_mean"]),
+        "raw_energy_j_per_inference_sd": float(model.get("energy_j_per_inference_sd", 0.0)),
+        "throughput_inferences_per_s": throughput,
+        "performance_per_watt_inferences_per_s_per_w": throughput / power_w,
+        "backend": backend,
+        "power_scope": power_scope,
+    }
+
+
 def build_records() -> list[dict]:
-    def _load(p):
-        return json.loads(p.read_text(encoding="utf-8"))
+    board = read_json(BOARD_PATH)["models"]
+    host = read_json(HOST_PATH)["models"]
+    gpu_int8 = read_json(GPU_INT8_PATH)["models"]["gpu_int8"]
+    arm_int8 = read_json(ARM_INT8_PATH)["models"]["2.5d_fused_arm_cpu"]
 
-    local_fp32 = _load(LOCAL_FP32_PATH)
-    local_cpu_int8 = _load(LOCAL_CPU_INT8_PATH)
-    local_gpu_int8 = _load(LOCAL_GPU_INT8_PATH)
-    board_fp32_dpu = _load(BOARD_FP32_DPU_PATH)
-    board_arm_int8 = _load(BOARD_ARM_INT8_PATH)
-
-    def make_rec(platform, precision, data_dict, backend):
-        tot_ms = float(data_dict.get("total_runtime_ms_mean") or data_dict.get("latency_ms_mean") or 0.0)
-        tot_sd = float(data_dict.get("total_runtime_ms_sd") or data_dict.get("latency_ms_sd") or 0.0)
-        mod_ms = float(data_dict.get("model_inference_ms_mean") or 0.0)
-        mod_sd = float(data_dict.get("model_inference_ms_sd") or 0.0)
-        data_ms = max(0.0, tot_ms - mod_ms)
-
-        pwr = float(data_dict.get("power_mean_w_mean") or data_dict.get("power_mean_w") or data_dict.get("raw_mean_power_w") or 0.0)
-        pwr_sd = float(data_dict.get("power_mean_w_sd") or data_dict.get("raw_mean_power_sd_w") or 0.0)
-        eng = float(data_dict.get("energy_j_per_inference_mean") or data_dict.get("raw_energy_j") or data_dict.get("raw_energy_j_per_inference") or 0.0)
-        eng_sd = float(data_dict.get("energy_j_per_inference_sd") or data_dict.get("raw_energy_j_per_inference_sd") or 0.0)
-
-        tp = float(data_dict.get("throughput_inferences_per_s") or (1000.0 / tot_ms if tot_ms > 0 else 0.0))
-        pw = float(data_dict.get("performance_per_watt_inferences_per_s_per_w") or (tp / pwr if pwr > 0 else 0.0))
-
-        return {
-            "platform": platform,
-            "precision": precision,
-            "backend": backend,
-            "status": "measured",
-            "total_s": tot_ms / 1000.0,
-            "total_s_sd": tot_sd / 1000.0,
-            "model_s": mod_ms / 1000.0,
-            "model_s_sd": mod_sd / 1000.0,
-            "data_s": data_ms / 1000.0,
-            "raw_mean_power_w": pwr,
-            "raw_mean_power_sd_w": pwr_sd,
-            "raw_energy_j_per_inference": eng,
-            "raw_energy_j_per_inference_sd": eng_sd,
-            "throughput_inferences_per_s": tp,
-            "performance_per_watt_inferences_per_s_per_w": pw,
-        }
+    board_scope = "monitored PSINTFP + INT rails"
+    desktop_scope = "CPU PPT/package + NVIDIA GPU board"
 
     records = [
-        make_rec("Local CPU", "FP32", local_fp32["models"]["2.5d_cpu"], "PyTorch FP32"),
-        make_rec("Local CPU", "INT8", local_cpu_int8["models"]["cpu_int8"], "ONNX Runtime QOperator INT8"),
-        make_rec("Local GPU", "FP32", local_fp32["models"]["2.5d_gpu"], "PyTorch FP32 CUDA"),
-        make_rec("Local GPU", "INT8", local_gpu_int8["models"]["gpu_int8"], "TensorRT INT8 from Vitis Q/DQ ONNX"),
-        make_rec("ARM CPU", "FP32", board_fp32_dpu["models"]["2.5d_fused_arm_cpu"], "PyTorch FP32"),
-        make_rec("ARM CPU", "INT8", board_arm_int8["models"]["2.5d_fused_arm_cpu"], "ONNX Runtime INT8 Quantized"),
-        make_rec("FPGA DPU", "INT8", board_fp32_dpu["models"]["2.5d_fused_dpu"], "Vitis AI 2.5 DPU"),
+        make_record("FPGA DPU", "INT8", board["2.5d_fused_dpu"], "total_runtime_ms_mean", "Vitis AI 2.5 DPU", board_scope),
+        make_record("ARM CPU", "FP32", board["2.5d_fused_arm_cpu"], "total_runtime_ms_mean", "PyTorch FP32", board_scope),
+        make_record("ARM CPU", "INT8", arm_int8, "total_runtime_ms_mean", "ONNX Runtime INT8 Quantized", board_scope),
+        make_record("Local CPU", "FP32", host["cpu_fp32"], "latency_ms_mean", "PyTorch FP32", desktop_scope),
+        make_record("Local CPU", "INT8", host["cpu_int8"], "latency_ms_mean", "ONNX Runtime QOperator INT8", desktop_scope),
+        make_record("Local GPU", "FP32", host["gpu_fp32"], "latency_ms_mean", "PyTorch FP32 CUDA", desktop_scope),
+        make_record("Local GPU", "INT8", gpu_int8, "latency_ms_mean", "TensorRT INT8 from Vitis Q/DQ ONNX", desktop_scope),
     ]
     return records
 
@@ -108,7 +110,7 @@ def label_bars(axis, containers, fmt: str) -> None:
         labels = []
         for bar in container:
             height = bar.get_height()
-            labels.append("" if not np.isfinite(height) else format(height, fmt))
+            labels.append("" if not np.isfinite(height) or height == 0 else format(height, fmt))
         axis.bar_label(container, labels=labels, padding=3, fontsize=8)
 
 
@@ -146,7 +148,7 @@ def plot_panel(axis, records, field, title, ylabel, log_scale=False, fmt=".3g"):
         axis.set_ylim(ymin, ymax * 2.2)
     else:
         ymin, ymax = axis.get_ylim()
-        axis.set_ylim(ymin, ymax * 1.15)
+        axis.set_ylim(0, ymax * 1.18)
 
     label_bars(axis, containers, fmt)
     return containers
@@ -212,7 +214,7 @@ def plot_stacked_chart(records, filename="stacked_runtime_breakdown"):
             edgecolor="white",
             linewidth=0.8,
             hatch="//",
-            alpha=0.5,
+            alpha=0.55,
         )
 
         for p, m_val, d_val in zip(positions, mod_y, dat_y):
@@ -230,13 +232,12 @@ def plot_stacked_chart(records, filename="stacked_runtime_breakdown"):
     ymin, ymax = axis.get_ylim()
     axis.set_ylim(ymin, ymax * 2.5)
 
-    # Custom legend for FP32/INT8 + Model vs Data Movement
     from matplotlib.patches import Patch
     legend_elements = [
         Patch(facecolor="#3977B8", edgecolor="white", label="FP32 Model Exec"),
-        Patch(facecolor="#3977B8", edgecolor="white", hatch="//", alpha=0.5, label="FP32 Data Move & Warp"),
+        Patch(facecolor="#3977B8", edgecolor="white", hatch="//", alpha=0.55, label="FP32 Data Move & Warp"),
         Patch(facecolor="#E57A2D", edgecolor="white", label="INT8 Model Exec"),
-        Patch(facecolor="#E57A2D", edgecolor="white", hatch="//", alpha=0.5, label="INT8 Data Move & Warp"),
+        Patch(facecolor="#E57A2D", edgecolor="white", hatch="//", alpha=0.55, label="INT8 Data Move & Warp"),
     ]
     axis.legend(handles=legend_elements, frameon=False, ncol=2, loc="upper right", fontsize=9)
 
@@ -266,7 +267,7 @@ def main():
         json.dumps(records, indent=2) + "\n", encoding="utf-8"
     )
 
-    # Generate all single figures matching style of generate_v4_precision_comparison.py
+    # 1. End-to-end latency
     save_single(
         records,
         "total_s",
@@ -275,6 +276,7 @@ def main():
         "v4_precision_latency",
         log_scale=True,
     )
+    # 2. Data movement + warping latency (Log scale)
     save_single(
         records,
         "data_s",
@@ -283,6 +285,7 @@ def main():
         "data_movement_warp_latency",
         log_scale=True,
     )
+    # 3. Model execution latency (Log scale)
     save_single(
         records,
         "model_s",
@@ -291,6 +294,7 @@ def main():
         "model_execution_latency",
         log_scale=True,
     )
+    # 4. Raw power (Log scale)
     save_single(
         records,
         "raw_mean_power_w",
@@ -299,6 +303,7 @@ def main():
         "v4_precision_raw_power",
         log_scale=True,
     )
+    # 5. Raw energy (Log scale)
     save_single(
         records,
         "raw_energy_j_per_inference",
@@ -307,6 +312,7 @@ def main():
         "v4_precision_raw_energy",
         log_scale=True,
     )
+    # 6. Performance per Watt (Log scale)
     save_single(
         records,
         "performance_per_watt_inferences_per_s_per_w",
@@ -316,7 +322,7 @@ def main():
         log_scale=True,
     )
 
-    # Stacked chart
+    # 7. Stacked chart
     plot_stacked_chart(records, "stacked_runtime_breakdown")
 
     print("All breakdown charts matching generate_v4_precision_comparison style generated cleanly.")
