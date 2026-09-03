@@ -1,0 +1,16 @@
+{
+  "bundle_name": "fpga_inference_int8_board_bundle",
+  "pipeline_version": "v4-canonical-letterbox-int8-arm",
+  "target": "FPGA-board ARM CPU",
+  "precision": "INT8 (software quantized)",
+  "output_file": "int8_arm_board_results_v4.json",
+  "files": [
+    "README_INT8_BOARD.txt",
+    "BUNDLE_MANIFEST.json",
+    "fpga_inference_int8.ipynb",
+    "vxm_2p5d_export.py",
+    "fpga_deployment_timing.py",
+    "fpga_deployment_power.py",
+    "2p5d_dense_pt_v4_canonical_best.pth"
+  ]
+}
