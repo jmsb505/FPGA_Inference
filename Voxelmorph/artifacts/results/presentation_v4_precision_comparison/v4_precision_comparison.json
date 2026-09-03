@@ -7,11 +7,10 @@
       "Local CPU FP32",
       "Local CPU INT8",
       "Local GPU FP32",
-      "Local GPU INT8"
-    ],
-    "pending": [
+      "Local GPU INT8",
       "ARM CPU INT8"
-    ]
+    ],
+    "pending": []
   },
   "comparison_warning": "Board and desktop power values cover different physical scopes; neither is whole-system wall power.",
   "records": [
@@ -50,8 +49,18 @@
     {
       "platform": "ARM CPU",
       "precision": "INT8",
-      "status": "pending_board_connection",
-      "reason": "ZCU104 is offline; run measure_v4_arm_int8.py from the board V4 notebook when connected."
+      "status": "measured",
+      "pair_count": 9,
+      "latency_ms_mean": 38937.25960036844,
+      "latency_ms_sd": 871.2113468754371,
+      "raw_mean_power_w": 2.0886493112501747,
+      "raw_mean_power_sd_w": 0.009506236707952765,
+      "raw_energy_j_per_inference": 81.37744470846987,
+      "raw_energy_j_per_inference_sd": 0.5050751650443642,
+      "throughput_inferences_per_s": 0.025682341548005028,
+      "performance_per_watt_inferences_per_s_per_w": 0.012296148237845009,
+      "backend": "PyTorch INT8 Quantized",
+      "power_scope": "monitored PSINTFP + INT rails"
     },
     {
       "platform": "Local CPU",

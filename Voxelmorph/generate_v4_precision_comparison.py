@@ -27,6 +27,10 @@ GPU_INT8_PATH = (
     / "inference_only_local_power_latency"
     / "v4_gpu_int8_tensorrt.json"
 )
+ARM_INT8_PATH = RESULTS_ROOT / "int8_arm_board_results_v4.json"
+ARM_INT8_BUNDLE_PATH = (
+    REPO_ROOT / "fpga_inference_int8_board_bundle" / "int8_arm_board_results_v4.json"
+)
 OUTPUT_DIR = RESULTS_ROOT / "presentation_v4_precision_comparison"
 
 
@@ -76,6 +80,33 @@ def build_records() -> list[dict]:
     board_scope = "monitored PSINTFP + INT rails"
     desktop_scope = "CPU PPT/package + NVIDIA GPU board"
 
+    arm_int8_file = None
+    if ARM_INT8_PATH.exists():
+        arm_int8_file = ARM_INT8_PATH
+    elif ARM_INT8_BUNDLE_PATH.exists():
+        arm_int8_file = ARM_INT8_BUNDLE_PATH
+
+    if arm_int8_file is not None:
+        arm_int8_model = read_json(arm_int8_file)["models"]["2.5d_fused_arm_cpu"]
+        arm_int8_record = make_record(
+            "ARM CPU",
+            "INT8",
+            arm_int8_model,
+            "total_runtime_ms_mean",
+            "PyTorch INT8 Quantized",
+            board_scope,
+        )
+    else:
+        arm_int8_record = {
+            "platform": "ARM CPU",
+            "precision": "INT8",
+            "status": "pending_board_connection",
+            "reason": (
+                "ZCU104 is offline; run measure_v4_arm_int8.py from the "
+                "board V4 notebook when connected."
+            ),
+        }
+
     records = [
         make_record(
             "FPGA DPU",
@@ -93,15 +124,7 @@ def build_records() -> list[dict]:
             "PyTorch FP32",
             board_scope,
         ),
-        {
-            "platform": "ARM CPU",
-            "precision": "INT8",
-            "status": "pending_board_connection",
-            "reason": (
-                "ZCU104 is offline; run measure_v4_arm_int8.py from the "
-                "board V4 notebook when connected."
-            ),
-        },
+        arm_int8_record,
         make_record(
             "Local CPU",
             "FP32",
@@ -201,22 +224,29 @@ def plot_panel(axis, records, field, title, ylabel, log_scale=False):
     axis.spines[["top", "right"]].set_visible(False)
     if log_scale:
         axis.set_yscale("log")
+        ymin, ymax = axis.get_ylim()
+        axis.set_ylim(ymin, ymax * 6.0)
+    else:
+        ymin, ymax = axis.get_ylim()
+        axis.set_ylim(ymin, ymax * 1.3)
     label_bars(axis, containers, ".3g")
     if field in {"latency_s", "raw_mean_power_w"}:
-        axis.text(
-            x[1] + width / 2,
-            axis.get_ylim()[0] * (1.7 if log_scale else 1.05),
-            "pending",
-            ha="center",
-            va="bottom",
-            fontsize=8,
-            color="#777777",
-            rotation=90,
-        )
+        arm_int8_rec = [r for r in records if r["platform"] == "ARM CPU" and r["precision"] == "INT8"]
+        if arm_int8_rec and arm_int8_rec[0].get("status") != "measured":
+            axis.text(
+                x[1] + width / 2,
+                axis.get_ylim()[0] * (1.7 if log_scale else 1.05),
+                "pending",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                color="#777777",
+                rotation=90,
+            )
     return containers
 
 
-def save_single(records, field, title, ylabel, filename, log_scale=False):
+def save_single(records, field, title, ylabel, filename, log_scale=False, legend_loc="upper right"):
     figure, axis = plt.subplots(figsize=(11, 5.8))
     containers = plot_panel(
         axis, records, field, title, ylabel, log_scale=log_scale
@@ -226,7 +256,7 @@ def save_single(records, field, title, ylabel, filename, log_scale=False):
         labels=["FP32", "INT8"],
         frameon=False,
         ncol=2,
-        loc="upper left",
+        loc=legend_loc,
     )
     figure.text(
         0.01,
@@ -237,24 +267,37 @@ def save_single(records, field, title, ylabel, filename, log_scale=False):
     )
     figure.tight_layout(rect=(0, 0.04, 1, 1))
     figure.savefig(OUTPUT_DIR / filename, format="svg", bbox_inches="tight")
+    png_filename = Path(filename).stem + ".png"
+    figure.savefig(OUTPUT_DIR / png_filename, dpi=300, bbox_inches="tight")
     plt.close(figure)
 
 
 def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     records = build_records()
+    arm_int8_measured = any(
+        r["platform"] == "ARM CPU" and r["precision"] == "INT8" and r.get("status") == "measured"
+        for r in records
+    )
+    complete_status = [
+        "FPGA DPU INT8",
+        "ARM CPU FP32",
+        "Local CPU FP32",
+        "Local CPU INT8",
+        "Local GPU FP32",
+        "Local GPU INT8",
+    ]
+    if arm_int8_measured:
+        complete_status.append("ARM CPU INT8")
+        pending_status = []
+    else:
+        pending_status = ["ARM CPU INT8"]
+
     payload = {
         "schema_version": 1,
         "measurement_status": {
-            "complete": [
-                "FPGA DPU INT8",
-                "ARM CPU FP32",
-                "Local CPU FP32",
-                "Local CPU INT8",
-                "Local GPU FP32",
-                "Local GPU INT8",
-            ],
-            "pending": ["ARM CPU INT8"],
+            "complete": complete_status,
+            "pending": pending_status,
         },
         "comparison_warning": (
             "Board and desktop power values cover different physical scopes; "
@@ -266,7 +309,7 @@ def main() -> None:
         json.dumps(payload, indent=2) + "\n", encoding="utf-8"
     )
 
-    figure, axes = plt.subplots(2, 2, figsize=(15, 9))
+    figure, axes = plt.subplots(2, 2, figsize=(15, 9.5))
     panels = [
         (
             "latency_s",
@@ -302,12 +345,12 @@ def main() -> None:
         frameon=False,
         ncol=2,
         loc="upper center",
-        bbox_to_anchor=(0.5, 0.995),
+        bbox_to_anchor=(0.5, 0.985),
     )
     figure.suptitle(
         "2.5D deployment: precision and hardware",
         x=0.05,
-        y=0.995,
+        y=0.992,
         ha="left",
         fontsize=19,
         fontweight="bold",
@@ -322,10 +365,15 @@ def main() -> None:
         fontsize=9,
         color="#555555",
     )
-    figure.tight_layout(rect=(0, 0.04, 1, 0.95))
+    figure.tight_layout(rect=(0, 0.04, 1, 0.93))
     figure.savefig(
         OUTPUT_DIR / "v4_precision_deployment_comparison.svg",
         format="svg",
+        bbox_inches="tight",
+    )
+    figure.savefig(
+        OUTPUT_DIR / "v4_precision_deployment_comparison.png",
+        dpi=300,
         bbox_inches="tight",
     )
     plt.close(figure)
@@ -337,6 +385,7 @@ def main() -> None:
         "Seconds (log scale)",
         "v4_precision_latency.svg",
         log_scale=True,
+        legend_loc="upper right",
     )
     save_single(
         records,
@@ -345,6 +394,7 @@ def main() -> None:
         "Watts (log scale)",
         "v4_precision_raw_power.svg",
         log_scale=True,
+        legend_loc="upper left",
     )
     save_single(
         records,
@@ -353,6 +403,7 @@ def main() -> None:
         "Joules (log scale)",
         "v4_precision_raw_energy.svg",
         log_scale=True,
+        legend_loc="upper center",
     )
     save_single(
         records,
@@ -361,6 +412,7 @@ def main() -> None:
         "Inferences/s/W (log scale)",
         "v4_precision_performance_per_watt.svg",
         log_scale=True,
+        legend_loc="upper center",
     )
     print(f"Wrote {OUTPUT_DIR.resolve()}")
 
