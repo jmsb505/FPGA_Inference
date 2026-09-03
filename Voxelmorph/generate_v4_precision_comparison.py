@@ -344,8 +344,8 @@ def main() -> None:
         labels=["FP32", "INT8"],
         frameon=False,
         ncol=2,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.985),
+        loc="upper right",
+        bbox_to_anchor=(0.95, 0.995),
     )
     figure.suptitle(
         "2.5D deployment: precision and hardware",
