@@ -40,6 +40,9 @@ def make_record(platform: str, precision: str, model: dict, latency_key: str, ba
         model_ms = float(model["cpu_model_ms_mean"])
     data_ms = max(0.0, latency_ms - model_ms)
 
+    dyn_eng = float(model.get("dynamic_energy_j_per_inference_mean", 0.0))
+    dyn_eng_sd = float(model.get("dynamic_energy_j_per_inference_sd", 0.0))
+
     return {
         "platform": platform,
         "precision": precision,
@@ -55,6 +58,8 @@ def make_record(platform: str, precision: str, model: dict, latency_key: str, ba
         "raw_mean_power_sd_w": float(model.get("power_mean_w_sd", 0.0)),
         "raw_energy_j_per_inference": float(model["energy_j_per_inference_mean"]),
         "raw_energy_j_per_inference_sd": float(model.get("energy_j_per_inference_sd", 0.0)),
+        "dynamic_energy_j_per_inference": dyn_eng,
+        "dynamic_energy_j_per_inference_sd": dyn_eng_sd,
         "throughput_inferences_per_s": throughput,
         "performance_per_watt_inferences_per_s_per_w": throughput / power_w,
         "backend": backend,
@@ -91,6 +96,7 @@ def grouped_values(records: list[dict], field: str):
         "model_s": "model_s_sd",
         "raw_mean_power_w": "raw_mean_power_sd_w",
         "raw_energy_j_per_inference": "raw_energy_j_per_inference_sd",
+        "dynamic_energy_j_per_inference": "dynamic_energy_j_per_inference_sd",
     }.get(field)
 
     for record in records:
@@ -154,7 +160,7 @@ def plot_panel(axis, records, field, title, ylabel, log_scale=False, fmt=".3g"):
     return containers
 
 
-def save_single(records, field, title, ylabel, filename, log_scale=False, legend_loc="upper right", fmt=".3g"):
+def save_single(records, field, title, ylabel, filename, log_scale=False, legend_loc="upper right", fmt=".3g", footnote="9 paired volumes • mean ± SD • raw power is not idle-subtracted"):
     figure, axis = plt.subplots(figsize=(11, 5.8))
     containers = plot_panel(axis, records, field, title, ylabel, log_scale=log_scale, fmt=fmt)
     axis.legend(
@@ -167,7 +173,7 @@ def save_single(records, field, title, ylabel, filename, log_scale=False, legend
     figure.text(
         0.01,
         0.01,
-        "9 paired volumes • mean ± SD • raw power is not idle-subtracted",
+        footnote,
         fontsize=8.5,
         color="#555555",
     )
@@ -312,7 +318,17 @@ def main():
         "v4_precision_raw_energy",
         log_scale=True,
     )
-    # 6. Performance per Watt (Log scale)
+    # 6. Dynamic energy per inference (idle-subtracted) (Log scale)
+    save_single(
+        records,
+        "dynamic_energy_j_per_inference",
+        "Dynamic energy per inference",
+        "Joules (log scale)",
+        "v4_precision_dynamic_energy",
+        log_scale=True,
+        footnote="9 paired volumes • mean ± SD • idle baseline subtracted",
+    )
+    # 7. Performance per Watt (Log scale)
     save_single(
         records,
         "performance_per_watt_inferences_per_s_per_w",
@@ -322,7 +338,7 @@ def main():
         log_scale=True,
     )
 
-    # 7. Stacked chart
+    # 8. Stacked chart
     plot_stacked_chart(records, "stacked_runtime_breakdown")
 
     print("All breakdown charts matching generate_v4_precision_comparison style generated cleanly.")
