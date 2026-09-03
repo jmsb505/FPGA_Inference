@@ -35,6 +35,7 @@ Voxelmorph/trained_weights/
 *.png
 *.svg
 *.zip
+/Voxelmorph/fpga_inference_fp32_board_bundle/
 
 # Preserve compact, canonical result sources only
 Voxelmorph/artifacts/*
@@ -58,6 +59,18 @@ Voxelmorph/artifacts/results/compare_v4_local_fpga_results/*
 Voxelmorph/artifacts/results/inference_only_local_power_latency/*
 !Voxelmorph/artifacts/results/inference_only_local_power_latency/common_idle_calibration.json
 !Voxelmorph/artifacts/results/inference_only_local_power_latency/local_2p5d_3d_cpu_gpu_9_pairs.json
+!Voxelmorph/artifacts/results/inference_only_local_power_latency/v4_fp32_int8_host_comparison.json
+!Voxelmorph/artifacts/results/inference_only_local_power_latency/v4_gpu_int8_tensorrt.json
+
+!Voxelmorph/artifacts/results/presentation_v4_precision_comparison/
+Voxelmorph/artifacts/results/presentation_v4_precision_comparison/*
+!Voxelmorph/artifacts/results/presentation_v4_precision_comparison/README.md
+!Voxelmorph/artifacts/results/presentation_v4_precision_comparison/v4_precision_comparison.json
+!Voxelmorph/artifacts/results/presentation_v4_precision_comparison/v4_precision_deployment_comparison.svg
+!Voxelmorph/artifacts/results/presentation_v4_precision_comparison/v4_precision_latency.svg
+!Voxelmorph/artifacts/results/presentation_v4_precision_comparison/v4_precision_performance_per_watt.svg
+!Voxelmorph/artifacts/results/presentation_v4_precision_comparison/v4_precision_raw_energy.svg
+!Voxelmorph/artifacts/results/presentation_v4_precision_comparison/v4_precision_raw_power.svg
 
 !Voxelmorph/artifacts/results/inference_pipeline_breakdown/
 Voxelmorph/artifacts/results/inference_pipeline_breakdown/*

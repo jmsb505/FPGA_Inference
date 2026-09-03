@@ -354,6 +354,8 @@ def run_benchmark(
     minimum_power_window_s=MINIMUM_POWER_WINDOW_S,
     power_sample_interval_s=POWER_SAMPLE_INTERVAL_S,
     idle_calibration_s=IDLE_CALIBRATION_S,
+    devices=("fpga", "cpu"),
+    pairs=PAIRS,
 ):
     if latency_repetitions < 1:
         raise ValueError("latency_repetitions must be at least one")
@@ -363,11 +365,21 @@ def run_benchmark(
         raise ValueError("power_sample_interval_s must be positive")
     if idle_calibration_s <= 0.0:
         raise ValueError("idle_calibration_s must be positive")
+    devices = tuple(devices)
+    invalid_devices = sorted(set(devices) - {"fpga", "cpu"})
+    if invalid_devices:
+        raise ValueError(f"Unsupported devices: {invalid_devices}")
+    if not devices:
+        raise ValueError("devices must contain at least one execution target")
+    selected_pairs = tuple(pairs)
+    if not selected_pairs:
+        raise ValueError("pairs must contain at least one subject pair")
+
 
     weights_path = _resolve_weights(namespace)
-    warm_moving = _load_volume(namespace, SUBJECTS[PAIRS[0][0]], "mr")
-    warm_fixed = _load_volume(namespace, SUBJECTS[PAIRS[0][1]], "ct")
-    for device in ("fpga", "cpu"):
+    warm_moving = _load_volume(namespace, SUBJECTS[selected_pairs[0][0]], "mr")
+    warm_fixed = _load_volume(namespace, SUBJECTS[selected_pairs[0][1]], "ct")
+    for device in devices:
         print(f"Warming the complete {device.upper()} inference path...")
         _warm_complete_pipeline(
             namespace,
@@ -386,9 +398,9 @@ def run_benchmark(
     idle_dpu_w = float(idle["dpu"]["mean_w"])
 
     rows = []
-    for device in ("fpga", "cpu"):
+    for device in devices:
         print(f"\nInference-only benchmark: {device.upper()}")
-        for pair_index, (moving_idx, fixed_idx) in enumerate(PAIRS):
+        for pair_index, (moving_idx, fixed_idx) in enumerate(selected_pairs):
             moving_id = SUBJECTS[moving_idx]
             fixed_id = SUBJECTS[fixed_idx]
             moving_raw = _load_volume(namespace, moving_id, "mr")
@@ -424,7 +436,7 @@ def run_benchmark(
             )
             rows.append(result)
             print(
-                f"  Pair {pair_index + 1}/{len(PAIRS)}: "
+                f"  Pair {pair_index + 1}/{len(selected_pairs)}: "
                 f"accelerator={result['accelerator_ms']:.1f} ms, "
                 f"ARM CPU={result['cpu_host_ms']:.1f} ms, "
                 f"total={result['total_runtime_ms']:.1f} ms, "
@@ -433,7 +445,11 @@ def run_benchmark(
             )
             gc.collect()
 
-    model_names = ("2.5d_fused_dpu", "2.5d_fused_arm_cpu")
+    model_names = tuple(
+        "2.5d_fused_dpu" if device == "fpga"
+        else "2.5d_fused_arm_cpu"
+        for device in devices
+    )
     models = {model: _aggregate(rows, model) for model in model_names}
     payload = {
         "schema_version": 2,
@@ -441,8 +457,9 @@ def run_benchmark(
             "%Y-%m-%dT%H:%M:%SZ"
         ),
         "platform": platform.platform(),
-        "pair_count": len(PAIRS),
+        "pair_count": len(selected_pairs),
         "settings": {
+            "devices": list(devices),
             "latency_repetitions": int(latency_repetitions),
             "minimum_power_window_s": float(minimum_power_window_s),
             "power_sample_interval_s": float(power_sample_interval_s),

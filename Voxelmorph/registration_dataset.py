@@ -1,4 +1,5 @@
 import glob
+import json
 import os
 
 import nibabel as nib
@@ -24,42 +25,52 @@ class RegistrationDataset(Dataset):
 
         print(f"Found {len(self.pairs)} volume pairs for split '{split}'")
 
-    def _find_pairs(self):
-        all_files = glob.glob(os.path.join(self.volumes_dir, '*.nii.gz'))
-        mr_files = [path for path in all_files if path.endswith('_mr.nii.gz')]
+    def _pair_for_id(self, subject_id):
+        mr_path = os.path.join(self.volumes_dir, f"{subject_id}_mr.nii.gz")
+        ct_path = os.path.join(self.volumes_dir, f"{subject_id}_ct.nii.gz")
+        if not os.path.exists(mr_path) or not os.path.exists(ct_path):
+            return None
 
-        pairs = []
-        for mr_path in mr_files:
-            subject_id = os.path.basename(mr_path).replace('_mr.nii.gz', '')
-            ct_path = os.path.join(self.volumes_dir, f'{subject_id}_ct.nii.gz')
-            if not os.path.exists(ct_path):
-                continue
-
-            mr_seg_path = os.path.join(self.seg_dir, f'{subject_id}_mr.nii.gz')
-            ct_seg_path = os.path.join(self.seg_dir, f'{subject_id}_ct.nii.gz')
-
-            if not os.path.exists(mr_seg_path) and not os.path.exists(ct_seg_path):
-                common_seg_path = os.path.join(self.seg_dir, f'{subject_id}.nii.gz')
-                if os.path.exists(common_seg_path):
-                    mr_seg_path = common_seg_path
-                    ct_seg_path = common_seg_path
-                else:
-                    mr_seg_path = None
-                    ct_seg_path = None
+        mr_seg_path = os.path.join(self.seg_dir, f"{subject_id}_mr.nii.gz")
+        ct_seg_path = os.path.join(self.seg_dir, f"{subject_id}_ct.nii.gz")
+        if not os.path.exists(mr_seg_path) and not os.path.exists(ct_seg_path):
+            common_seg_path = os.path.join(self.seg_dir, f"{subject_id}.nii.gz")
+            if os.path.exists(common_seg_path):
+                mr_seg_path = common_seg_path
+                ct_seg_path = common_seg_path
             else:
-                if not os.path.exists(mr_seg_path):
-                    mr_seg_path = None
-                if not os.path.exists(ct_seg_path):
-                    ct_seg_path = None
+                mr_seg_path = None
+                ct_seg_path = None
+        else:
+            if not os.path.exists(mr_seg_path):
+                mr_seg_path = None
+            if not os.path.exists(ct_seg_path):
+                ct_seg_path = None
 
-            pairs.append({
-                'id': subject_id,
-                'mr_path': mr_path,
-                'ct_path': ct_path,
-                'mr_seg_path': mr_seg_path,
-                'ct_seg_path': ct_seg_path,
-            })
+        return {
+            "id": subject_id,
+            "mr_path": mr_path,
+            "ct_path": ct_path,
+            "mr_seg_path": mr_seg_path,
+            "ct_seg_path": ct_seg_path,
+        }
 
+    def _find_pairs(self):
+        ids_path = os.path.join(self.data_root, f"{self.split}_ids.json")
+        if os.path.exists(ids_path):
+            with open(ids_path, "r", encoding="utf-8") as file:
+                subject_ids = json.load(file)
+            pairs = [self._pair_for_id(subject_id) for subject_id in subject_ids]
+            return [pair for pair in pairs if pair is not None]
+
+        all_files = glob.glob(os.path.join(self.volumes_dir, '*.nii.gz'))
+        subject_ids = sorted(
+            os.path.basename(path).replace('_mr.nii.gz', '')
+            for path in all_files
+            if path.endswith('_mr.nii.gz')
+        )
+        pairs = [self._pair_for_id(subject_id) for subject_id in subject_ids]
+        pairs = [pair for pair in pairs if pair is not None]
         pairs.sort(key=lambda pair: pair['id'])
         n_val = max(1, int(len(pairs) * 0.1))
         n_test = max(1, int(len(pairs) * 0.1))

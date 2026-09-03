@@ -73,6 +73,21 @@ Local conclusions:
 - 2.5D GPU is 3.74 times faster than 2.5D CPU and reduces absolute energy by about 74%.
 - These totals combine Ryzen CPU PPT/package and NVIDIA board power. They exclude RAM, motherboard, storage, display, and PSU losses.
 
+### V4 FP32 and native INT8 deployment comparison
+
+The updated presentation comparison uses raw workload power without idle subtraction and defines performance per watt as throughput divided by raw mean power.
+
+| Platform | Precision | Latency (ms) | Raw mean power (W) | Absolute energy (J) | Performance/W (inferences/s/W) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| FPGA DPU | INT8 | 13087.88 | 1.8475 | 24.243 | 0.04136 |
+| ARM CPU | FP32 | 38258.93 | 2.0941 | 81.136 | 0.01248 |
+| Local CPU | FP32 | 1059.55 | 129.291 | 140.049 | 0.00730 |
+| Local CPU | INT8 | 5571.23 | 128.060 | 714.338 | 0.00140 |
+| Local GPU | FP32 | 379.58 | 139.204 | 53.342 | 0.01893 |
+| Local GPU | INT8 | 263.48 | 130.888 | 34.559 | 0.02900 |
+
+TensorRT INT8 improves local GPU latency and performance per watt, while the ONNX Runtime QOperator INT8 path is substantially slower than PyTorch FP32 on the local CPU. ARM CPU INT8 is intentionally absent until a native board run is completed. TensorRT uses the Vitis Q/DQ export; the CPU model uses backend-specific scales calibrated from the same 64 samples.
+
 ### Matched FPGA inference-to-warp latency, power, and energy
 
 The final board benchmark uses the same inference-to-warp boundary as the local run. Latency is collected without monitoring over three repetitions. A separate repeated execution supplies at least 10 seconds of 0.1-second rail samples after a shared 20-second idle calibration.

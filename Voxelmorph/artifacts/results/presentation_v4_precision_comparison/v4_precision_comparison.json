@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "measurement_status": {
+    "complete": [
+      "FPGA DPU INT8",
+      "ARM CPU FP32",
+      "Local CPU FP32",
+      "Local CPU INT8",
+      "Local GPU FP32",
+      "Local GPU INT8"
+    ],
+    "pending": [
+      "ARM CPU INT8"
+    ]
+  },
+  "comparison_warning": "Board and desktop power values cover different physical scopes; neither is whole-system wall power.",
+  "records": [
+    {
+      "platform": "FPGA DPU",
+      "precision": "INT8",
+      "status": "measured",
+      "pair_count": 9,
+      "latency_ms_mean": 13087.87653517599,
+      "latency_ms_sd": 74.82642262147496,
+      "raw_mean_power_w": 1.8475197525342872,
+      "raw_mean_power_sd_w": 0.010904556840945635,
+      "raw_energy_j_per_inference": 24.243124727424092,
+      "raw_energy_j_per_inference_sd": 0.10286358858321834,
+      "throughput_inferences_per_s": 0.07640658874740472,
+      "performance_per_watt_inferences_per_s_per_w": 0.041356304116692645,
+      "backend": "Vitis AI 2.5 DPU",
+      "power_scope": "monitored PSINTFP + INT rails"
+    },
+    {
+      "platform": "ARM CPU",
+      "precision": "FP32",
+      "status": "measured",
+      "pair_count": 9,
+      "latency_ms_mean": 38258.92916478699,
+      "latency_ms_sd": 213.37558401484665,
+      "raw_mean_power_w": 2.0941353545543024,
+      "raw_mean_power_sd_w": 0.009381170195718155,
+      "raw_energy_j_per_inference": 81.13605569493457,
+      "raw_energy_j_per_inference_sd": 0.37226906852177155,
+      "throughput_inferences_per_s": 0.026137689209565926,
+      "performance_per_watt_inferences_per_s_per_w": 0.012481375261977201,
+      "backend": "PyTorch FP32",
+      "power_scope": "monitored PSINTFP + INT rails"
+    },
+    {
+      "platform": "ARM CPU",
+      "precision": "INT8",
+      "status": "pending_board_connection",
+      "reason": "ZCU104 is offline; run measure_v4_arm_int8.py from the board V4 notebook when connected."
+    },
+    {
+      "platform": "Local CPU",
+      "precision": "FP32",
+      "status": "measured",
+      "pair_count": 9,
+      "latency_ms_mean": 1059.5513925925304,
+      "latency_ms_sd": 12.622009597419664,
+      "raw_mean_power_w": 129.29119444444444,
+      "raw_mean_power_sd_w": 6.432431938011687,
+      "raw_energy_j_per_inference": 140.0491784937645,
+      "raw_energy_j_per_inference_sd": 7.202379226015087,
+      "throughput_inferences_per_s": 0.9437956544544583,
+      "performance_per_watt_inferences_per_s_per_w": 0.007299767462972902,
+      "backend": "PyTorch FP32",
+      "power_scope": "CPU PPT/package + NVIDIA GPU board"
+    },
+    {
+      "platform": "Local CPU",
+      "precision": "INT8",
+      "status": "measured",
+      "pair_count": 9,
+      "latency_ms_mean": 5571.231877777858,
+      "latency_ms_sd": 7.741770024169163,
+      "raw_mean_power_w": 128.05951150486032,
+      "raw_mean_power_sd_w": 4.149197481846177,
+      "raw_energy_j_per_inference": 714.3384831209228,
+      "raw_energy_j_per_inference_sd": 22.967472409623813,
+      "throughput_inferences_per_s": 0.1794935163242317,
+      "performance_per_watt_inferences_per_s_per_w": 0.0014016414260444783,
+      "backend": "ONNX Runtime QOperator INT8",
+      "power_scope": "CPU PPT/package + NVIDIA GPU board"
+    },
+    {
+      "platform": "Local GPU",
+      "precision": "FP32",
+      "status": "measured",
+      "pair_count": 9,
+      "latency_ms_mean": 379.57509629622007,
+      "latency_ms_sd": 17.142281179249665,
+      "raw_mean_power_w": 139.2035275153696,
+      "raw_mean_power_sd_w": 1.1816401196702304,
+      "raw_energy_j_per_inference": 53.342344050595344,
+      "raw_energy_j_per_inference_sd": 0.7160574370348596,
+      "throughput_inferences_per_s": 2.634524787736867,
+      "performance_per_watt_inferences_per_s_per_w": 0.01892570421712903,
+      "backend": "PyTorch FP32 CUDA",
+      "power_scope": "CPU PPT/package + NVIDIA GPU board"
+    },
+    {
+      "platform": "Local GPU",
+      "precision": "INT8",
+      "status": "measured",
+      "pair_count": 9,
+      "latency_ms_mean": 263.4770140370569,
+      "latency_ms_sd": 30.566301832116114,
+      "raw_mean_power_w": 130.8880052591349,
+      "raw_mean_power_sd_w": 6.214384814165075,
+      "raw_energy_j_per_inference": 34.55879469539171,
+      "raw_energy_j_per_inference_sd": 2.0363752012422025,
+      "throughput_inferences_per_s": 3.7953974985436654,
+      "performance_per_watt_inferences_per_s_per_w": 0.028997290401282037,
+      "backend": "TensorRT INT8 from Vitis Q/DQ ONNX",
+      "power_scope": "CPU PPT/package + NVIDIA GPU board"
+    }
+  ]
+}

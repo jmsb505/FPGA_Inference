@@ -148,11 +148,10 @@ exit 1
         if text is None:
             return None
         raw = str(text).strip().replace(',', '.')
-        if not raw:
+        if not raw.lower().endswith(' w'):
             return None
-        parts = raw.split()
         try:
-            return float(parts[0])
+            return float(raw[:-2].strip())
         except Exception:
             return None
 
@@ -470,10 +469,13 @@ def parse_power_value_w(text):
     if text is None:
         return None
     raw = str(text).strip().replace(',', '.')
-    if not raw:
+    # The web tree mixes temperatures, voltages, loads, and power. Accept only
+    # values explicitly reported in watts so names cannot select the wrong
+    # sensor type accidentally.
+    if not raw.lower().endswith(' w'):
         return None
     try:
-        return float(raw.split()[0])
+        return float(raw[:-2].strip())
     except Exception:
         return None
 
@@ -541,21 +543,28 @@ def list_web_power_sensors():
 
 
 def query_cpu_power_w():
+    selected = select_cpu_power_sensor()
+    return None if selected is None else float(selected['value'])
+
+
+def select_cpu_power_sensor():
     candidates = []
     for sensor in list_windows_power_sensors():
         value = sensor.get('value')
         score = sensor.get('cpu_score') or 0
         if value is not None and score:
-            candidates.append((score, value))
+            candidate = dict(sensor)
+            candidate.setdefault('backend', 'LibreHardwareMonitor/OpenHardwareMonitor WMI')
+            candidates.append(candidate)
     for sensor in list_web_power_sensors():
         value = sensor.get('value')
         score = sensor.get('cpu_score') or 0
         if value is not None and score:
-            candidates.append((score, value))
+            candidates.append(dict(sensor))
     if not candidates:
         return None
-    candidates.sort(reverse=True, key=lambda item: item[0])
-    return float(candidates[0][1])
+    candidates.sort(reverse=True, key=lambda item: int(item.get('cpu_score') or 0))
+    return candidates[0]
 
 
 def write_json(path, payload):
@@ -604,8 +613,10 @@ def sensor_payload(repo_root, devices):
     out['windows_power_sensors'] = power_sensors[:80]
     out['windows_web_power_sensors'] = web_power_sensors[:80]
     out['windows_cpu_power_candidates'] = (cpu_candidates + web_cpu_candidates)[:20]
-    out['cpu_power_w'] = query_cpu_power_w()
-    out['cpu_power_backend'] = 'LibreHardwareMonitor/OpenHardwareMonitor WMI or web' if out['cpu_power_w'] is not None else None
+    selected_cpu_sensor = select_cpu_power_sensor()
+    out['cpu_power_sensor'] = selected_cpu_sensor
+    out['cpu_power_w'] = None if selected_cpu_sensor is None else float(selected_cpu_sensor['value'])
+    out['cpu_power_backend'] = None if selected_cpu_sensor is None else selected_cpu_sensor.get('backend')
     if out['cpu_power_w'] is None:
         out['cpu_power_note'] = 'No CPU package power sensor was found. In WSL, enable LibreHardwareMonitor > Options > Remote Web Server > Run on Windows, or confirm Linux RAPL is exposed in /sys/class/powercap. The notebook can use RAPL energy even when this instantaneous check is null.'
     out['gpu_power_w'] = query_gpu_power_w()

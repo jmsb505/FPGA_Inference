@@ -49,12 +49,15 @@ def _load_power_queries():
     from windows_metrics_package.run_windows_benchmark import (
         query_cpu_power_w,
         query_gpu_power_w,
+        select_cpu_power_sensor,
     )
 
-    return query_cpu_power_w, query_gpu_power_w
+    return query_cpu_power_w, query_gpu_power_w, select_cpu_power_sensor
 
 
-QUERY_CPU_POWER_W, QUERY_GPU_POWER_W = _load_power_queries()
+QUERY_CPU_POWER_W, QUERY_GPU_POWER_W, SELECT_CPU_POWER_SENSOR = (
+    _load_power_queries()
+)
 
 
 def synchronize(device: torch.device) -> None:
@@ -462,6 +465,7 @@ def aggregate(rows: list[dict], configuration: str) -> dict:
 def main() -> None:
     os.environ["V4_MEASURE_LOCAL_POWER"] = "0"
     namespace = load_measurement_namespace()
+    selected_cpu_sensor = SELECT_CPU_POWER_SENSOR()
     dataset = namespace["load_split"]("test", None)
     pairs = namespace["build_eval_pairs"](
         len(dataset), max_pairs=None, seed=namespace["PAIR_SEED"]
@@ -575,6 +579,18 @@ def main() -> None:
                 "per-configuration idle-subtracted CPU plus GPU energy, "
                 "clamped independently at zero"
             ),
+        },
+        "sensor_selection": {
+            "cpu": selected_cpu_sensor,
+            "gpu": {
+                "name": "NVIDIA GPU board power.draw",
+                "backend": "nvidia-smi",
+                "device": (
+                    torch.cuda.get_device_name(0)
+                    if torch.cuda.is_available()
+                    else None
+                ),
+            },
         },
         "idle_calibrations": idle_calibrations,
         "models": models,

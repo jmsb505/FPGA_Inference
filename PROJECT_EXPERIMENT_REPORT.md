@@ -131,6 +131,23 @@ The corrected local benchmark starts when normalized raw in-memory moving/fixed 
 
 The 3D GPU draws the highest mean monitored power but uses the least absolute energy because it finishes fastest. Energy depends on both power and duration. Desktop totals combine CPU PPT/package and NVIDIA GPU board telemetry; they are not wall-plug totals.
 
+#### 7.2.1 V4 precision comparison
+
+The refreshed V4 host run adds native INT8 backends and reports performance per watt as throughput divided by raw mean power. Raw power is not idle-subtracted.
+
+| Platform | Precision | Latency (ms) | Raw mean power (W) | Absolute energy (J) | Performance/W (inferences/s/W) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| FPGA DPU | INT8 | 13087.88 | 1.8475 | 24.243 | 0.04136 |
+| ARM CPU | FP32 | 38258.93 | 2.0941 | 81.136 | 0.01248 |
+| Local CPU | FP32 | 1059.55 | 129.291 | 140.049 | 0.00730 |
+| Local CPU | INT8 | 5571.23 | 128.060 | 714.338 | 0.00140 |
+| Local GPU | FP32 | 379.58 | 139.204 | 53.342 | 0.01893 |
+| Local GPU | INT8 | 263.48 | 130.888 | 34.559 | 0.02900 |
+
+TensorRT INT8 reduces local GPU latency by 30.6% and improves performance per watt by 53.2% relative to PyTorch FP32. The ONNX Runtime QOperator INT8 CPU path is 5.26 times slower than PyTorch FP32 on this AMD host, showing that quantization does not guarantee acceleration without a favorable runtime/kernel path. ARM CPU INT8 remains unmeasured because the board was unavailable; the board runner is prepared and no simulated value is used.
+
+The local GPU INT8 engine is built from the Vitis NNDCT Q/DQ ONNX export and all 17 convolutions use INT8 weights/tactics. The local CPU INT8 model uses the same architecture and 64 calibration samples but backend-specific ONNX Runtime scales.
+
 ### 7.3 Matched FPGA inference-to-warp measurement
 
 The final board file applies the same boundary as the local benchmark. Latency uses three unmonitored repetitions per pair. Power uses a separate repeated pass of at least 10 seconds, sampled every 0.1 seconds after one shared 20-second idle calibration. PSINTFP represents the ARM/PS rail and INT the DPU/PL rail. Energy is integrated from those samples and normalized per inference; it is not derived from the earlier full-evaluation mean power.
@@ -161,8 +178,8 @@ Desktop and FPGA totals still cover different hardware boundaries. Cross-platfor
 - Canonical resampling may remove fine detail.
 - Letterboxing reduces active coronal content.
 - DPU/PS rails and desktop CPU/GPU sensors cover different hardware boundaries.
-- The current metric-free board timing has a first-pair outlier.
-- Direct inference-only FPGA power is pending.
+- Native ARM CPU INT8 performance and power remain pending until the board is connected and its ONNX Runtime CPU provider is verified.
+- Host INT8 backends are not bit-identical: TensorRT reuses Vitis Q/DQ scales, while the CPU QOperator model uses backend-specific scales from the same calibration samples.
 - No 3D FPGA implementation exists.
 
 ## 10. Completed Final FPGA Run
