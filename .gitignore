@@ -85,6 +85,10 @@ Voxelmorph/artifacts/results/presentation_inputs/*
 !Voxelmorph/artifacts/results/int8_arm_cpu_v4_results/
 !Voxelmorph/artifacts/results/int8_arm_cpu_v4_results/**
 
+!Voxelmorph/artifacts/results/presentation_deployment_breakdown_v4/
+!Voxelmorph/artifacts/results/presentation_deployment_breakdown_v4/**
+
+
 
 
 # Python, notebooks, editors, and local agent state
